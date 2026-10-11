@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* Leaflet Map 기본 및 커스텀 스타일 */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #090d16 !important;
+  font-family: inherit;
+}
+
+/* 터치 편의성 및 모바일 풀스크린 터치 확대 억제 */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #020617;
+  color: #f8fafc;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* 텍스트 입력창은 선택 허용 */
+input,
+textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* 커스텀 Leaflet 핀 클래스 */
+.custom-ditch-pin {
+  background: transparent;
+  border: none;
+}
+
+.user-gps-pulse {
+  background: transparent;
+  border: none;
+}
+
+/* A4 인쇄 / PDF 출력 최적화 (@media print) */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  #root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* 인쇄 시 화면 상단/하단 헤더, 네비게이션, 모달 배경 등 숨김 */
+  .no-print,
+  header,
+  .leaflet-container,
+  button:not(.print-include) {
+    display: none !important;
+  }
+
+  /* 사진대지 모달 오버레이 투명화 */
+  .fixed {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+  }
+}
