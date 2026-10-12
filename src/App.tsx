@@ -83,11 +83,20 @@ export const App: React.FC = () => {
     initFirebase();
   }, []);
 
-  // HTML5 Geolocation 위치 추적
-  useEffect(() => {
-    if (!navigator.geolocation) return;
+  // GPS 에러 메시지 및 권한 상태
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
 
-    const watchId = navigator.geolocation.watchPosition(
+  // 위치 요청 함수 (수동 재시도 가능)
+  const refreshGpsLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsErrorMsg('이 브라우저는 위치 추적(GPS)을 지원하지 않습니다.');
+      return;
+    }
+
+    setGpsErrorMsg(null);
+
+    // 1단계: 빠른 초기 위치 획득 (Wi-Fi/네트워크 기반 포함, 빠른 응답)
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCurrentGps({
           latitude: pos.coords.latitude,
@@ -96,27 +105,58 @@ export const App: React.FC = () => {
         });
       },
       (err) => {
-        console.warn('Geolocation watch error:', err.message);
-        // 기본 서울/경기 좌표 fallback
-        if (!currentGps && ditches.length > 0) {
-          setCurrentGps({
-            latitude: ditches[0].latitude,
-            longitude: ditches[0].longitude,
-            accuracy: 3.5,
-          });
+        console.warn('Initial quick GPS error:', err.code, err.message);
+        if (err.code === 1) { // PERMISSION_DENIED
+          setGpsErrorMsg('위치 권한이 차단되었습니다. 브라우저 주소창 옆 자물쇠(🔒)를 눌러 위치를 "허용"해주세요.');
+        } else if (err.code === 2) { // POSITION_UNAVAILABLE
+          setGpsErrorMsg('GPS 신호를 수신할 수 없습니다. 스마트폰의 "위치" 기능이 켜져 있는지 확인해주세요.');
+        } else if (err.code === 3) { // TIMEOUT
+          setGpsErrorMsg('GPS 신호 수신 시간이 초과되었습니다. 실외에서 다시 시도해주세요.');
+        }
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    );
+
+    // 2단계: 실시간 고정밀 GPS 연속 추적 (watchPosition)
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setGpsErrorMsg(null);
+        setCurrentGps({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (err) => {
+        console.warn('High-accuracy GPS watch error:', err.code, err.message);
+        if (err.code === 1) {
+          setGpsErrorMsg('위치 권한이 거부되었습니다. 브라우저 설정에서 위치를 허용해주세요.');
         }
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 2000,
+        timeout: 30000, // 충분한 위성 탐색 시간 제공
+        maximumAge: 3000,
       }
     );
 
+    return watchId;
+  };
+
+  // HTML5 Geolocation 위치 추적
+  useEffect(() => {
+    const watchId = refreshGpsLocation();
+
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (watchId && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
     };
-  }, [ditches]);
+  }, []);
 
   // 세션 변경 처리
   const handleSelectSession = (newSession: UserSession) => {
@@ -296,6 +336,8 @@ export const App: React.FC = () => {
             }}
             onUpdateDitchCoordinates={handleUpdateDitchCoordinates}
             currentGps={currentGps}
+            gpsErrorMsg={gpsErrorMsg}
+            onRetryGps={refreshGpsLocation}
           />
         ) : (
           <AdminDashboard

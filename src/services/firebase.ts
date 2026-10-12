@@ -1,38 +1,28 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, collection, doc, setDoc, getDocs } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { FirebaseConfigState } from '../types';
-import { getFirebaseConfig } from './storage';
+import { DitchMaster, InspectionRecord } from '../types';
+
+// 사용자의 실제 Firebase 프로젝트 설정
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC3ZKNYAbbecwxs4dbWRWq0O1JoHWxCniE",
+  authDomain: "drainmanager-af9b0.firebaseapp.com",
+  projectId: "drainmanager-af9b0",
+  storageBucket: "drainmanager-af9b0.firebasestorage.app",
+  messagingSenderId: "959877789556",
+  appId: "1:959877789556:web:d7ba60ca9c638323b75e21",
+  measurementId: "G-5NFJY0B9HE"
+};
 
 let appInstance: FirebaseApp | null = null;
 let dbInstance: Firestore | null = null;
 let storageInstance: FirebaseStorage | null = null;
 
-export function initFirebase(customConfig?: FirebaseConfigState) {
-  const config = customConfig || getFirebaseConfig();
-
-  // 환경변수 또는 사용자 로컬 스토리지에 저장된 config
-  const apiKey = config.apiKey || import.meta.env.VITE_FIREBASE_API_KEY;
-  const authDomain = config.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
-  const projectId = config.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  const storageBucket = config.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
-  const messagingSenderId = config.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
-  const appId = config.appId || import.meta.env.VITE_FIREBASE_APP_ID;
-
-  if (!apiKey || !projectId) {
-    return { initialized: false, error: 'Firebase 설정이 입력되지 않아 로컬 모드(IndexedDB)로 작동합니다.' };
-  }
-
+export function initFirebase(customConfig?: any) {
   try {
+    const configToUse = customConfig || DEFAULT_FIREBASE_CONFIG;
     if (getApps().length === 0) {
-      appInstance = initializeApp({
-        apiKey,
-        authDomain,
-        projectId,
-        storageBucket,
-        messagingSenderId,
-        appId,
-      });
+      appInstance = initializeApp(configToUse);
     } else {
       appInstance = getApps()[0];
     }
@@ -47,4 +37,34 @@ export function initFirebase(customConfig?: FirebaseConfigState) {
 
 export function isFirebaseReady(): boolean {
   return !!appInstance && !!dbInstance;
+}
+
+// 클라우드 Firestore에 점검 기록 저장
+export async function syncInspectionToCloud(record: InspectionRecord): Promise<boolean> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return false;
+
+    const ref = doc(dbInstance, 'inspections', record.id);
+    await setDoc(ref, record);
+    return true;
+  } catch (err) {
+    console.warn('Cloud sync inspection failed (offline):', err);
+    return false;
+  }
+}
+
+// 클라우드 Firestore에 배수로 정보 저장
+export async function syncDitchToCloud(ditch: DitchMaster): Promise<boolean> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return false;
+
+    const ref = doc(dbInstance, 'ditches', ditch.id);
+    await setDoc(ref, ditch);
+    return true;
+  } catch (err) {
+    console.warn('Cloud sync ditch failed (offline):', err);
+    return false;
+  }
 }

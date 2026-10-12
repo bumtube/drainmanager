@@ -1,19 +1,21 @@
 import { get, set } from 'idb-keyval';
 import { DitchMaster, InspectionRecord, UserSession, FirebaseConfigState } from '../types';
 import { INITIAL_DITCHES, INITIAL_INSPECTIONS } from './seedData';
+import { syncDitchToCloud, syncInspectionToCloud } from './firebase';
 
-const DITCHES_KEY = 'dm_ditches_v1';
-const INSPECTIONS_KEY = 'dm_inspections_v1';
+const DITCHES_KEY = 'dm_ditches_v2';
+const INSPECTIONS_KEY = 'dm_inspections_v2';
 const USER_SESSION_KEY = 'dm_user_session';
 const FIREBASE_CONFIG_KEY = 'dm_firebase_config';
 
 // 1. 배수로 목록 조회
 export async function getDitches(): Promise<DitchMaster[]> {
   try {
-    const data = await get<DitchMaster[]>(DITCHES_KEY);
-    if (!data || data.length === 0) {
-      // 초기 시드 데이터 주입
+    let data = await get<DitchMaster[]>(DITCHES_KEY);
+    // 기존 데이터가 없거나 구버전(파주시 좌표 37.7 이상)인 경우 분당구 불정로 50으로 자동 갱신
+    if (!data || data.length === 0 || (data[0] && data[0].latitude > 37.5)) {
       await set(DITCHES_KEY, INITIAL_DITCHES);
+      await set(INSPECTIONS_KEY, INITIAL_INSPECTIONS);
       return INITIAL_DITCHES;
     }
     return data;
@@ -33,6 +35,8 @@ export async function saveDitch(ditch: DitchMaster): Promise<void> {
     current.unshift(ditch);
   }
   await set(DITCHES_KEY, current);
+  // 파이어베이스 클라우드에도 자동 동기화
+  syncDitchToCloud(ditch).catch(() => {});
 }
 
 // 3. 배수로 삭제 (관리자 전용)
@@ -70,6 +74,9 @@ export async function saveInspection(record: InspectionRecord): Promise<void> {
   const inspections = await getInspections();
   inspections.unshift(record);
   await set(INSPECTIONS_KEY, inspections);
+
+  // 파이어베이스 클라우드에도 자동 동기화
+  syncInspectionToCloud(record).catch(() => {});
 
   // 배수로 마스터의 currentStatus 및 lastInspectedAt 업데이트
   const ditches = await getDitches();
