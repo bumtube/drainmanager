@@ -60,11 +60,11 @@ export const MapView: React.FC<MapViewProps> = ({
   // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('streets');
 
-  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (반경 300m 정밀 제한)
+  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (남·동·서 300m, 위쪽/북쪽 400m 확장)
   const FACILITY_CENTER: [number, number] = [37.357515, 127.112388];
   const FACILITY_BOUNDS = L.latLngBounds(
-    [37.3548, 127.1090], // 남서쪽 (SW: 반경 300m)
-    [37.3602, 127.1158]  // 북동쪽 (NE: 반경 300m)
+    [37.3548, 127.1090], // 남서쪽 (SW: 남 300m, 서 300m)
+    [37.3612, 127.1158]  // 북동쪽 (NE: 북 400m, 동 300m)
   );
 
   // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
