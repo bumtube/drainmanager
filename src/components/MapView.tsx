@@ -558,28 +558,19 @@ export const MapView: React.FC<MapViewProps> = ({
 
             {/* 액션 버튼 그룹 */}
             {userRole === 'INSPECTOR' ? (
-              // [주사님 모드]: 현장 점검칸과 촬영칸으로 명확히 분리
+              // [주사님 모드]: 현장 점검 시작 (촬영은 점검 내부에서 수행)
               <div className="space-y-2 pt-1">
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    onClick={() =>
-                      onOpenInspectionForm
-                        ? onOpenInspectionForm(selectedDitch)
-                        : onStartInspection(selectedDitch)
-                    }
-                    className="h-14 bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-xl flex items-center justify-center gap-2 shadow-xl shadow-blue-950/60 active:scale-95 transition-all"
-                  >
-                    <CheckCircle2 className="w-5 h-5 text-blue-200" />
-                    현장 점검
-                  </button>
-                  <button
-                    onClick={() => onStartInspection(selectedDitch)}
-                    className="h-14 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base rounded-xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/60 active:scale-95 transition-all"
-                  >
-                    <Camera className="w-5 h-5" />
-                    현장 촬영
-                  </button>
-                </div>
+                <button
+                  onClick={() =>
+                    onOpenInspectionForm
+                      ? onOpenInspectionForm(selectedDitch)
+                      : onStartInspection(selectedDitch)
+                  }
+                  className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg rounded-xl flex items-center justify-center gap-2.5 shadow-xl shadow-blue-950/60 active:scale-95 transition-all"
+                >
+                  <CheckCircle2 className="w-6 h-6 text-blue-200" />
+                  현장 점검
+                </button>
                 <button
                   onClick={() => onViewHistory(selectedDitch)}
                   className="w-full h-11 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700"
@@ -589,30 +580,23 @@ export const MapView: React.FC<MapViewProps> = ({
                 </button>
               </div>
             ) : (
-              // [관리자 모드]: 점검, 촬영, 수정 분리
+              // [관리자 모드]: 점검과 수정 (촬영칸 제거)
               <div className="space-y-2 pt-1">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   <button
                     onClick={() =>
                       onOpenInspectionForm
                         ? onOpenInspectionForm(selectedDitch)
                         : onStartInspection(selectedDitch)
                     }
-                    className="h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1 active:scale-95"
+                    className="h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 active:scale-95 shadow"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
+                    <CheckCircle2 className="w-4 h-4 text-blue-200" />
                     점검
                   </button>
                   <button
-                    onClick={() => onStartInspection(selectedDitch)}
-                    className="h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1 active:scale-95"
-                  >
-                    <Camera className="w-4 h-4" />
-                    촬영
-                  </button>
-                  <button
                     onClick={() => onEditDitch(selectedDitch)}
-                    className="h-12 bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1 border border-slate-700 active:scale-95"
+                    className="h-12 bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95"
                   >
                     <Edit className="w-4 h-4" />
                     수정

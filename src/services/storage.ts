@@ -113,9 +113,18 @@ export async function saveInspection(record: InspectionRecord): Promise<void> {
     ditch.lastInspectedAt = record.inspectedAt;
     
     // 긴급도 및 손상도에 따른 자동 상태 판정
-    if (record.urgencyLevel === '긴급조치' || record.sedimentStatus === '완전막힘' || record.structureStatus === '파손/붕괴') {
+    if (
+      record.urgencyLevel === '긴급조치' ||
+      record.sedimentStatus === '완전막힘' ||
+      record.structureStatus === '파손/붕괴'
+    ) {
       ditch.currentStatus = 'DANGER';
-    } else if (record.sedimentStatus === '준설필요(>30%)' || record.structureStatus === '균열/이탈') {
+    } else if (
+      record.sedimentStatus === '준설필요' ||
+      record.sedimentStatus === '준설필요(>30%)' ||
+      record.urgencyLevel === '조치예정' ||
+      record.structureStatus === '균열/이탈'
+    ) {
       ditch.currentStatus = 'WARNING';
     } else {
       ditch.currentStatus = 'GOOD';

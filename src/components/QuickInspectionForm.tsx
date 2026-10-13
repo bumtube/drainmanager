@@ -43,9 +43,9 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
   onCancel,
 }) => {
   // 폼 상태
-  const [sedimentStatus, setSedimentStatus] = useState<SedimentStatus>('정상(<30%)');
+  const [sedimentStatus, setSedimentStatus] = useState<SedimentStatus>('정상');
   const [structureStatus, setStructureStatus] = useState<StructureStatus>('정상');
-  const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('정기점검');
+  const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('조치완료');
   const [memo, setMemo] = useState<string>('');
 
   // 비포/애프터 비교 모달
@@ -252,19 +252,19 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
           )}
         </div>
 
-        {/* 3. 퇴적 상태 선택 (최소 56px 대형 버튼) */}
+        {/* 1. 퇴적 상태 선택 */}
         <div>
           <label className="block text-sm font-black text-white mb-2 flex items-center gap-1.5">
             <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
               1
             </span>
-            퇴적 상태 선택 (수로 내부 토사/낙엽)
+            퇴적 상태 선택
           </label>
           <div className="grid grid-cols-3 gap-2">
             {(
               [
-                { value: '정상(<30%)', label: '정상 (<30%)', color: 'emerald', desc: '통수 원활' },
-                { value: '준설필요(>30%)', label: '준설필요 (>30%)', color: 'amber', desc: '통수 저해' },
+                { value: '정상', label: '정상', color: 'emerald', desc: '통수 원활' },
+                { value: '준설필요', label: '준설필요', color: 'amber', desc: '통수 저해' },
                 { value: '완전막힘', label: '완전막힘', color: 'rose', desc: '범람 위험' },
               ] as const
             ).map((item) => {
@@ -284,7 +284,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
                       : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
                   }`}
                 >
-                  <span>{item.label}</span>
+                  <span className="font-black text-sm">{item.label}</span>
                   <span className="text-[10px] font-normal opacity-80 mt-0.5">{item.desc}</span>
                 </button>
               );
@@ -292,88 +292,48 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
           </div>
         </div>
 
-        {/* 4. 구조 상태 선택 (최소 56px 대형 버튼) */}
+        {/* 2. 조치 구분 선택 */}
         <div>
           <label className="block text-sm font-black text-white mb-2 flex items-center gap-1.5">
             <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
               2
-            </span>
-            구조 상태 선택 (콘크리트 측벽/플륨관)
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                { value: '정상', label: '정상', color: 'emerald', desc: '외관 양호' },
-                { value: '균열/이탈', label: '균열 / 이탈', color: 'amber', desc: '크랙/침하' },
-                { value: '파손/붕괴', label: '파손 / 붕괴', color: 'rose', desc: '수로 훼손' },
-              ] as const
-            ).map((item) => {
-              const selected = structureStatus === item.value;
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setStructureStatus(item.value)}
-                  className={`min-h-[58px] p-2 rounded-xl font-bold text-xs sm:text-sm border-2 transition-all flex flex-col items-center justify-center active:scale-95 ${
-                    selected
-                      ? item.color === 'emerald'
-                        ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg'
-                        : item.color === 'amber'
-                        ? 'bg-amber-600 border-amber-400 text-white shadow-lg'
-                        : 'bg-rose-600 border-rose-400 text-white shadow-lg'
-                      : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  <span className="text-[10px] font-normal opacity-80 mt-0.5">{item.desc}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 5. 조치 구분 선택 (최소 56px 대형 버튼) */}
-        <div>
-          <label className="block text-sm font-black text-white mb-2 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
-              3
             </span>
             조치 구분 선택
           </label>
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setUrgencyLevel('정기점검')}
+              onClick={() => setUrgencyLevel('조치완료')}
               className={`min-h-[58px] py-3 px-4 rounded-xl font-black text-sm border-2 transition-all flex items-center justify-center gap-2 active:scale-95 ${
-                urgencyLevel === '정기점검'
-                  ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg'
+                urgencyLevel === '조치완료'
+                  ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-950'
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
               }`}
             >
-              <CheckCircle2 className="w-5 h-5" />
-              정기점검 (일반)
+              <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+              조치완료
             </button>
             <button
               type="button"
-              onClick={() => setUrgencyLevel('긴급조치')}
+              onClick={() => setUrgencyLevel('조치예정')}
               className={`min-h-[58px] py-3 px-4 rounded-xl font-black text-sm border-2 transition-all flex items-center justify-center gap-2 active:scale-95 ${
-                urgencyLevel === '긴급조치'
-                  ? 'bg-rose-600 border-rose-400 text-white shadow-lg shadow-rose-950 animate-pulse'
+                urgencyLevel === '조치예정'
+                  ? 'bg-amber-600 border-amber-400 text-white shadow-lg shadow-amber-950'
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
               }`}
             >
-              <Flame className="w-5 h-5 text-yellow-300" />
-              긴급조치 요망
+              <AlertTriangle className="w-5 h-5 text-amber-200" />
+              조치예정
             </button>
           </div>
         </div>
 
-        {/* 6. 특이사항 메모 (음성인식 지원) */}
+        {/* 3. 특이사항 메모 (음성인식 지원) */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-black text-white flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
-                4
+                3
               </span>
               특이사항 메모 (음성 입력 지원)
             </label>

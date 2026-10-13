@@ -1,7 +1,7 @@
 export type DrainStatus = 'GOOD' | 'WARNING' | 'DANGER'; // 정상: 초록, 주의: 주황, 긴급: 빨강
-export type SedimentStatus = '정상(<30%)' | '준설필요(>30%)' | '완전막힘';
+export type SedimentStatus = '정상' | '준설필요' | '완전막힘' | '정상(<30%)' | '준설필요(>30%)';
 export type StructureStatus = '정상' | '균열/이탈' | '파손/붕괴';
-export type UrgencyLevel = '정기점검' | '긴급조치';
+export type UrgencyLevel = '조치완료' | '조치예정' | '정기점검' | '긴급조치';
 export type UserRole = 'ADMIN' | 'INSPECTOR';
 
 export interface UserSession {
