@@ -54,8 +54,15 @@ export const MapView: React.FC<MapViewProps> = ({
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userCircleRef = useRef<L.Circle | null>(null);
 
-  // 지도 타일 종류: 'satellite' | 'streets'
-  const [mapType, setMapType] = useState<'satellite' | 'streets'>('satellite');
+  // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
+  const [mapType, setMapType] = useState<'satellite' | 'streets'>('streets');
+
+  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (반경 약 600m 제한)
+  const FACILITY_CENTER: [number, number] = [37.357515, 127.112388];
+  const FACILITY_BOUNDS = L.latLngBounds(
+    [37.3510, 127.1050], // 남서쪽 (SW)
+    [37.3640, 127.1200]  // 북동쪽 (NE)
+  );
 
   // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
   const [selectedSection, setSelectedSection] = useState<string>('ALL');
@@ -171,15 +178,20 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
       zoom: 18,
+      minZoom: 16, // 최소 축소 제한 (복지관 부지 및 주변 도로 전경)
+      maxZoom: 19, // 최대 확대 제한 (정밀 배수로/수목 점검)
+      maxBounds: FACILITY_BOUNDS, // 부지 밖 이동 차단 (투명 울타리)
+      maxBoundsViscosity: 1.0, // 경계에 도달 시 단단하게 튕겨나옴
       zoomControl: false, // 커스텀 위치에 둘 예정
     });
 
-    // 위성 지도 타일 기본 적용 (야외 현장 식별용 Esri World Imagery)
+    // 일반 지도 타일 기본 적용 (OpenStreetMap & crossOrigin 캐시 지원)
     const tileLayer = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
       {
         maxZoom: 19,
-        attribution: 'Tiles &copy; Esri',
+        attribution: '&copy; OpenStreetMap contributors',
+        crossOrigin: true,
       }
     ).addTo(map);
 
@@ -202,7 +214,7 @@ export const MapView: React.FC<MapViewProps> = ({
     };
   }, []);
 
-  // 2. 타일 레이어 전환 (위성 vs 일반)
+  // 2. 타일 레이어 전환 (일반 vs 위성)
   useEffect(() => {
     if (!mapRef.current || !tileLayerRef.current) return;
 
@@ -222,6 +234,7 @@ export const MapView: React.FC<MapViewProps> = ({
     const newLayer = L.tileLayer(newUrl, {
       maxZoom: 19,
       attribution: attr,
+      crossOrigin: true,
     }).addTo(mapRef.current);
 
     tileLayerRef.current = newLayer;
@@ -385,13 +398,13 @@ export const MapView: React.FC<MapViewProps> = ({
             </div>
           </button>
 
-          {/* 위성/일반 지도 토글 버튼 */}
+          {/* 일반/위성 지도 토글 버튼 */}
           <button
-            onClick={() => setMapType((prev) => (prev === 'satellite' ? 'streets' : 'satellite'))}
+            onClick={() => setMapType((prev) => (prev === 'streets' ? 'satellite' : 'streets'))}
             className="pointer-events-auto bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-700 text-white px-3 py-2 rounded-xl shadow-xl flex items-center gap-1.5 text-xs font-bold active:scale-95 transition-all"
           >
             <Layers className="w-4 h-4 text-emerald-400" />
-            {mapType === 'satellite' ? '위성지도' : '일반지도'}
+            {mapType === 'streets' ? '일반지도 (기본)' : '위성지도'}
           </button>
         </div>
 
@@ -440,7 +453,7 @@ export const MapView: React.FC<MapViewProps> = ({
         )}
       </div>
 
-      {/* 3. 우측 컨트롤 버튼 (내 위치로 이동, 줌 등) */}
+      {/* 3. 우측 컨트롤 버튼 (내 위치로 이동, 복지관 부지 원위치, 줌 등) */}
       <div className="absolute right-3 top-28 sm:top-24 z-10 flex flex-col gap-2.5">
         <button
           onClick={handlePanToCurrentLocation}
@@ -448,6 +461,16 @@ export const MapView: React.FC<MapViewProps> = ({
           title="현재 내 위치로 이동"
         >
           <Navigation className="w-6 h-6 text-blue-400" />
+        </button>
+
+        <button
+          onClick={() => {
+            mapRef.current?.flyTo(FACILITY_CENTER, 18, { duration: 0.8 });
+          }}
+          className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+          title="복지관 부지 원위치로 복귀"
+        >
+          <MapPin className="w-6 h-6 text-emerald-400" />
         </button>
 
         <button
