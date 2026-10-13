@@ -331,24 +331,25 @@ export const App: React.FC = () => {
 
         {/* 우측 사용자 권한 뱃지 & 설정 버튼 */}
         <div className="flex items-center gap-2">
-          {/* Firebase 클라우드 실시간 동기화 상태 표시 & 설정 버튼 */}
+          {/* Firebase 클라우드 실시간 동기화 상태 뱃지 & 설정 버튼 */}
           <button
             onClick={() => setIsFirebaseModalOpen(true)}
-            className={`relative p-2 rounded-xl transition-all ${
+            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
               isCloudConnected
-                ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
-                : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
             }`}
-            title={
-              isCloudConnected
-                ? '클라우드 실시간 동기화 연결됨 (모든 사용자 데이터 공유 중)'
-                : '클라우드 연결 대기 중 / Firebase 설정'
-            }
+            title="클라우드 실시간 동기화 상태 (클릭 시 상세 설정)"
           >
-            <Cloud className="w-5 h-5" />
-            {isCloudConnected && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
-            )}
+            <Cloud className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline font-bold">
+              {isCloudConnected ? '실시간 공유중' : '클라우드'}
+            </span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isCloudConnected ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400' : 'bg-slate-500'
+              }`}
+            />
           </button>
 
           {/* 역할 전환 버튼 */}
