@@ -423,6 +423,7 @@ export const App: React.FC = () => {
       {isDitchEditOpen && (
         <DitchEditModal
           ditch={editingDitch}
+          existingDitches={ditches}
           currentGps={currentGps}
           onSave={handleSaveDitch}
           onDelete={handleDeleteDitch}

@@ -4,8 +4,8 @@ import { DitchMaster, InspectionRecord } from '../types';
 export const INITIAL_DITCHES: DitchMaster[] = [
   {
     id: 'ditch-001',
-    code: 'DRAIN-001',
-    name: '주차장 배수로 1호',
+    code: 'DRAIN-주차장-1',
+    name: '주차장-1',
     section: '주차장',
     dimension: 'U형 0.6m',
     latitude: 37.35742,
@@ -18,8 +18,8 @@ export const INITIAL_DITCHES: DitchMaster[] = [
   },
   {
     id: 'ditch-002',
-    code: 'DRAIN-002',
-    name: '본관 정면 배수로',
+    code: 'DRAIN-본관-1',
+    name: '본관-1',
     section: '본관',
     dimension: '벤치플륨관 0.8m',
     latitude: 37.35760,
@@ -32,8 +32,8 @@ export const INITIAL_DITCHES: DitchMaster[] = [
   },
   {
     id: 'ditch-003',
-    code: 'DRAIN-003',
-    name: '별관 뒤편 배수로',
+    code: 'DRAIN-별관-1',
+    name: '별관-1',
     section: '별관',
     dimension: 'U형 0.8m',
     latitude: 37.35771,

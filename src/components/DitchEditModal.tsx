@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { X, MapPin, Save, Trash2, Navigation, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, MapPin, Save, Trash2, Navigation, Check, Plus, Minus } from 'lucide-react';
 import { DitchMaster, DrainStatus } from '../types';
 
 interface DitchEditModalProps {
   ditch: DitchMaster | null; // null이면 신규 등록
+  existingDitches?: DitchMaster[];
   currentGps?: { latitude: number; longitude: number; accuracy?: number } | null;
   onSave: (ditch: DitchMaster) => Promise<void>;
   onDelete?: (ditchId: string) => Promise<void>;
@@ -12,10 +13,10 @@ interface DitchEditModalProps {
 
 // 현장 맞춤형 3개 구역
 const SECTIONS = ['주차장', '본관', '별관'] as const;
-type SectionType = (typeof SECTIONS)[number];
 
 export const DitchEditModal: React.FC<DitchEditModalProps> = ({
   ditch,
+  existingDitches = [],
   currentGps,
   onSave,
   onDelete,
@@ -28,13 +29,43 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
     ditch?.section && SECTIONS.includes(ditch.section as any) ? ditch.section : '주차장'
   );
 
-  // 2. 현재 상태 (정상, 주의, 긴급)
+  // 구역별 다음 번호 자동 계산 유틸
+  const getNextNumberForSection = (sec: string): number => {
+    if (!existingDitches || existingDitches.length === 0) return 1;
+    const sameSection = existingDitches.filter((d) => d.section === sec);
+    let maxNum = 0;
+    sameSection.forEach((d) => {
+      const match = d.name.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    return maxNum + 1;
+  };
+
+  // 2. 번호 관리 (기존 번호 추출 or 다음 번호 자동 할당)
+  const initialNumber = ditch
+    ? parseInt(ditch.name.match(/\d+/)?.[0] || '1', 10)
+    : getNextNumberForSection(section);
+
+  const [ditchNumber, setDitchNumber] = useState<number>(initialNumber);
+
+  // 구역을 바꿨을 때 신규 등록이면 해당 구역의 다음 번호로 자동 세팅
+  const handleSelectSection = (newSec: string) => {
+    setSection(newSec);
+    if (isNew) {
+      setDitchNumber(getNextNumberForSection(newSec));
+    }
+  };
+
+  // 3. 현재 상태 (정상, 주의, 긴급)
   const [currentStatus, setCurrentStatus] = useState<DrainStatus>(ditch?.currentStatus || 'GOOD');
 
-  // 3. 특이사항
+  // 4. 특이사항
   const [memo, setMemo] = useState(ditch?.memo || '');
 
-  // 4. GPS 좌표 (분당구 불정로 50 기본값)
+  // 5. GPS 좌표 (분당구 불정로 50 기본값)
   const defaultLat = currentGps ? currentGps.latitude : 37.357515;
   const defaultLng = currentGps ? currentGps.longitude : 127.112388;
 
@@ -56,14 +87,14 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
 
-    // 관리코드 및 명칭 자동 생성
-    const randomCode = ditch?.code || `DRAIN-${String(Math.floor(Math.random() * 900) + 100)}`;
-    const autoName = `${section} 배수로`;
+    // 명칭: "주차장-1", "본관-2" 형태로 명확하게 생성
+    const autoName = `${section}-${ditchNumber}`;
+    const autoCode = `DRAIN-${section}-${ditchNumber}`;
 
     const item: DitchMaster = {
-      id: ditch?.id || `ditch-${Date.now()}`,
-      code: randomCode,
-      name: ditch?.name || autoName,
+      id: ditch?.id || `ditch-${section}-${ditchNumber}-${Date.now()}`,
+      code: autoCode,
+      name: autoName,
       section: section,
       dimension: ditch?.dimension || '표준 U형 배수로',
       latitude,
@@ -117,15 +148,15 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
           </button>
         </div>
 
-        {/* 간소화된 원터치 폼 */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          {/* 1. 구역 원터치 선택 (주차장, 본관, 별관) */}
+        {/* 간소화된 폼 */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* 1. 구역 원터치 선택 */}
           <div>
             <label className="block text-xs font-black text-white mb-2 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
                 1
               </span>
-              구역 선택 (원터치 터치)
+              구역 선택
             </label>
             <div className="grid grid-cols-3 gap-2">
               {SECTIONS.map((sec) => {
@@ -134,8 +165,8 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                   <button
                     key={sec}
                     type="button"
-                    onClick={() => setSection(sec)}
-                    className={`min-h-[54px] rounded-xl font-black text-sm border-2 transition-all flex items-center justify-center gap-1 active:scale-95 ${
+                    onClick={() => handleSelectSection(sec)}
+                    className={`min-h-[52px] rounded-xl font-black text-sm border-2 transition-all flex items-center justify-center gap-1 active:scale-95 ${
                       selected
                         ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-950'
                         : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
@@ -149,11 +180,48 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
             </div>
           </div>
 
-          {/* 2. 현재 상태 원터치 선택 */}
+          {/* 2. 배수로 번호 선택 (원터치 자동 카운트 + 증감 버튼) */}
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-white flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
+                  2
+                </span>
+                배수로 번호 (자동 카운트)
+              </label>
+              <span className="text-[11px] text-slate-400">지도 핀에 표시됨</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setDitchNumber((prev) => Math.max(1, prev - 1))}
+                className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white flex items-center justify-center font-black active:scale-95 text-lg"
+              >
+                <Minus className="w-5 h-5" />
+              </button>
+
+              <div className="flex-1 h-12 bg-slate-900 border-2 border-emerald-500/80 rounded-xl flex items-center justify-center shadow-inner">
+                <span className="text-lg font-black text-emerald-400 tracking-wider">
+                  {section}-{ditchNumber}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDitchNumber((prev) => prev + 1)}
+                className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white flex items-center justify-center font-black active:scale-95 text-lg"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* 3. 현재 상태 원터치 선택 */}
           <div>
             <label className="block text-xs font-black text-white mb-2 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
-                2
+                3
               </span>
               현재 상태
             </label>
@@ -171,7 +239,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                     key={st.value}
                     type="button"
                     onClick={() => setCurrentStatus(st.value)}
-                    className={`min-h-[50px] rounded-xl font-black text-xs sm:text-sm border-2 transition-all flex items-center justify-center active:scale-95 ${
+                    className={`min-h-[48px] rounded-xl font-black text-xs sm:text-sm border-2 transition-all flex items-center justify-center active:scale-95 ${
                       selected
                         ? st.color === 'emerald'
                           ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg'
@@ -188,11 +256,11 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
             </div>
           </div>
 
-          {/* 3. 특이사항 메모 */}
+          {/* 4. 특이사항 메모 */}
           <div>
             <label className="block text-xs font-black text-white mb-1.5 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
-                3
+                4
               </span>
               특이사항
             </label>
@@ -205,8 +273,8 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
             />
           </div>
 
-          {/* 4. GPS 위치 정보 */}
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+          {/* 5. GPS 위치 정보 */}
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
             <div>
               <span className="text-slate-400 block text-[10px]">설정 좌표</span>
               <span className="text-slate-200 font-mono font-bold">
@@ -222,8 +290,8 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
             </button>
           </div>
 
-          {/* 5. 하단 버튼 */}
-          <div className="pt-2 flex items-center justify-between gap-2">
+          {/* 6. 하단 버튼 */}
+          <div className="pt-1 flex items-center justify-between gap-2">
             {!isNew && onDelete ? (
               <button
                 type="button"
@@ -247,7 +315,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
               disabled={isSubmitting}
               className="flex-1 h-12 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/40 active:scale-95 transition-all"
             >
-              <Save className="w-4 h-4" /> {isNew ? '배수로 핀 등록' : '수정 완료'}
+              <Save className="w-4 h-4" /> {isNew ? `${section}-${ditchNumber} 핀 등록` : '수정 완료'}
             </button>
           </div>
         </form>

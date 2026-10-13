@@ -57,43 +57,41 @@ export const MapView: React.FC<MapViewProps> = ({
   // 지도 타일 종류: 'satellite' | 'streets'
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('satellite');
 
-  // SVG 마커 생성 유틸
-  const createCustomMarkerIcon = (status: DrainStatus, isSelected: boolean, isDraggable: boolean) => {
-    let pinColor = '#22c55e'; // GOOD: 초록
-    let borderColor = '#15803d';
-    let label = '정상';
+  // SVG/HTML 마커 생성 유틸 (지도 핀에 배수로 번호/명칭 직접 표시)
+  const createCustomMarkerIcon = (ditch: DitchMaster, isSelected: boolean, isDraggable: boolean) => {
+    let pinColor = '#16a34a'; // GOOD: 초록
+    let borderColor = '#14532d';
 
-    if (status === 'WARNING') {
-      pinColor = '#f59e0b'; // 주의: 주황
-      borderColor = '#b45309';
-      label = '주의';
-    } else if (status === 'DANGER') {
-      pinColor = '#ef4444'; // 긴급: 빨강
-      borderColor = '#b91c1c';
-      label = '긴급';
+    if (ditch.currentStatus === 'WARNING') {
+      pinColor = '#d97706'; // 주의: 주황
+      borderColor = '#78350f';
+    } else if (ditch.currentStatus === 'DANGER') {
+      pinColor = '#dc2626'; // 긴급: 빨강
+      borderColor = '#7f1d1d';
     }
 
-    const scale = isSelected ? 'scale-125 ring-4 ring-white' : 'scale-100';
+    const scale = isSelected ? 'scale-125 z-50 ring-4 ring-white' : 'scale-100';
+    const displayName = ditch.name || '배수로';
 
     const html = `
-      <div class="relative flex items-center justify-center transform transition-transform duration-200 ${scale}">
-        <div style="background-color: ${pinColor}; border: 2.5px solid ${borderColor};" class="w-9 h-9 rounded-full shadow-2xl flex items-center justify-center text-white text-[11px] font-black border-2 border-white">
-          ${label}
+      <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
+        <div style="background-color: ${pinColor}; border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="px-2.5 py-1 rounded-full flex items-center justify-center text-white text-[12px] font-black tracking-tight whitespace-nowrap min-w-[50px]">
+          ${displayName}
         </div>
         ${
           isDraggable
-            ? '<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white"></span>'
+            ? '<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white shadow"></span>'
             : ''
         }
-        <div style="border-top-color: ${pinColor};" class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]"></div>
+        <div style="border-top-color: ${pinColor};" class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] -mt-[1px]"></div>
       </div>
     `;
 
     return L.divIcon({
       html,
       className: 'custom-ditch-pin',
-      iconSize: [36, 44],
-      iconAnchor: [18, 44],
+      iconSize: [64, 36],
+      iconAnchor: [32, 34],
     });
   };
 
@@ -191,7 +189,7 @@ export const MapView: React.FC<MapViewProps> = ({
       const isDraggable = userRole === 'ADMIN'; // 관리자만 핀 위치 드래그 수정 허용
 
       const marker = L.marker([ditch.latitude, ditch.longitude], {
-        icon: createCustomMarkerIcon(ditch.currentStatus, isSelected, isDraggable),
+        icon: createCustomMarkerIcon(ditch, isSelected, isDraggable),
         draggable: isDraggable,
       });
 
