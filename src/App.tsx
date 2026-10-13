@@ -18,6 +18,8 @@ import {
   saveInspection,
   getUserSession,
   saveUserSession,
+  setDitchesCache,
+  setInspectionsCache,
 } from './services/storage';
 import {
   initFirebase,
@@ -43,6 +45,7 @@ export const App: React.FC = () => {
   const [ditches, setDitches] = useState<DitchMaster[]>([]);
   const [inspections, setInspections] = useState<InspectionRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
   // 3. 네비게이션 뷰: 'map' | 'dashboard'
   const [currentView, setCurrentView] = useState<'map' | 'dashboard'>('map');
@@ -91,9 +94,15 @@ export const App: React.FC = () => {
     const unsubscribe = subscribeToCloudUpdates(
       (cloudDitches) => {
         setDitches(cloudDitches);
+        // 클라우드 데이터를 로컬 캐시(IndexedDB)에도 즉시 저장하여 다음 접속 시 깜빡임/불일치 방지
+        setDitchesCache(cloudDitches).catch(() => {});
       },
       (cloudInspections) => {
         setInspections(cloudInspections);
+        setInspectionsCache(cloudInspections).catch(() => {});
+      },
+      (connected) => {
+        setIsCloudConnected(connected);
       }
     );
 
@@ -322,13 +331,24 @@ export const App: React.FC = () => {
 
         {/* 우측 사용자 권한 뱃지 & 설정 버튼 */}
         <div className="flex items-center gap-2">
-          {/* Firebase / GitHub 연동 모달 버튼 */}
+          {/* Firebase 클라우드 실시간 동기화 상태 표시 & 설정 버튼 */}
           <button
             onClick={() => setIsFirebaseModalOpen(true)}
-            className="p-2 text-slate-400 hover:text-amber-400 rounded-xl hover:bg-slate-800 transition-colors"
-            title="Firebase 및 GitHub 배포 설정"
+            className={`relative p-2 rounded-xl transition-all ${
+              isCloudConnected
+                ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+            }`}
+            title={
+              isCloudConnected
+                ? '클라우드 실시간 동기화 연결됨 (모든 사용자 데이터 공유 중)'
+                : '클라우드 연결 대기 중 / Firebase 설정'
+            }
           >
             <Cloud className="w-5 h-5" />
+            {isCloudConnected && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
+            )}
           </button>
 
           {/* 역할 전환 버튼 */}

@@ -1,7 +1,7 @@
 import { get, set } from 'idb-keyval';
 import { DitchMaster, InspectionRecord, UserSession, FirebaseConfigState } from '../types';
 import { INITIAL_DITCHES, INITIAL_INSPECTIONS } from './seedData';
-import { syncDitchToCloud, syncInspectionToCloud } from './firebase';
+import { syncDitchToCloud, syncInspectionToCloud, deleteDitchFromCloud } from './firebase';
 
 const DITCHES_KEY = 'dm_ditches_v2';
 const INSPECTIONS_KEY = 'dm_inspections_v2';
@@ -12,8 +12,8 @@ const FIREBASE_CONFIG_KEY = 'dm_firebase_config';
 export async function getDitches(): Promise<DitchMaster[]> {
   try {
     let data = await get<DitchMaster[]>(DITCHES_KEY);
-    // 기존 데이터가 없거나 구버전(파주시 좌표 37.7 이상)인 경우 분당구 불정로 50으로 자동 갱신
-    if (!data || data.length === 0 || (data[0] && data[0].latitude > 37.5)) {
+    // 기존 데이터가 아예 없는 최초 실행 시에만 초기 데이터 설정
+    if (!data || data.length === 0) {
       await set(DITCHES_KEY, INITIAL_DITCHES);
       await set(INSPECTIONS_KEY, INITIAL_INSPECTIONS);
       return INITIAL_DITCHES;
@@ -53,6 +53,23 @@ export async function getDitches(): Promise<DitchMaster[]> {
   }
 }
 
+// 1-1. 클라우드에서 받은 최신 데이터를 로컬 캐시(IndexedDB)에 저장 (동기화 보장)
+export async function setDitchesCache(ditches: DitchMaster[]): Promise<void> {
+  try {
+    await set(DITCHES_KEY, ditches);
+  } catch (err) {
+    console.warn('Failed to update local ditches cache:', err);
+  }
+}
+
+export async function setInspectionsCache(inspections: InspectionRecord[]): Promise<void> {
+  try {
+    await set(INSPECTIONS_KEY, inspections);
+  } catch (err) {
+    console.warn('Failed to update local inspections cache:', err);
+  }
+}
+
 // 2. 배수로 단건/신규 저장 (생성 또는 업데이트)
 export async function saveDitch(ditch: DitchMaster): Promise<void> {
   const current = await getDitches();
@@ -77,6 +94,9 @@ export async function deleteDitch(ditchId: string): Promise<void> {
   const inspections = await getInspections();
   const remainingInspections = inspections.filter((insp) => insp.ditchId !== ditchId);
   await set(INSPECTIONS_KEY, remainingInspections);
+
+  // 파이어베이스 클라우드에서도 영구 삭제
+  deleteDitchFromCloud(ditchId).catch(() => {});
 }
 
 // 4. 점검 기록 목록 조회 (ditchId 옵션 필터)

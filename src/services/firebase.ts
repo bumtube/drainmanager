@@ -5,6 +5,7 @@ import {
   collection,
   doc,
   setDoc,
+  deleteDoc,
   getDocs,
   onSnapshot,
 } from 'firebase/firestore';
@@ -63,7 +64,23 @@ export async function syncDitchToCloud(ditch: DitchMaster): Promise<boolean> {
   }
 }
 
-// 2. 클라우드 Firestore에 점검 기록 저장
+// 2. 클라우드 Firestore에서 배수로 삭제
+export async function deleteDitchFromCloud(ditchId: string): Promise<boolean> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return false;
+
+    const ref = doc(dbInstance, 'ditches', ditchId);
+    await deleteDoc(ref);
+    console.log('✅ 배수로 클라우드 삭제 완료:', ditchId);
+    return true;
+  } catch (err) {
+    console.warn('❌ 배수로 클라우드 삭제 실패:', err);
+    return false;
+  }
+}
+
+// 3. 클라우드 Firestore에 점검 기록 저장
 export async function syncInspectionToCloud(record: InspectionRecord): Promise<boolean> {
   try {
     if (!dbInstance) initFirebase();
@@ -74,12 +91,12 @@ export async function syncInspectionToCloud(record: InspectionRecord): Promise<b
     console.log('✅ 점검기록 클라우드 동기화 완료:', record.id);
     return true;
   } catch (err) {
-    console.warn('❌ 점검기록 클라우드 동기화 실패 (용량 초과 또는 권한 문제):', err);
+    console.warn('❌ 점검기록 클라우드 동기화 실패:', err);
     return false;
   }
 }
 
-// 3. 클라우드에서 배수로 전체 목록 가져오기 (1회성)
+// 4. 클라우드에서 배수로 전체 목록 가져오기 (1회성)
 export async function fetchDitchesFromCloud(): Promise<DitchMaster[]> {
   try {
     if (!dbInstance) initFirebase();
@@ -97,7 +114,7 @@ export async function fetchDitchesFromCloud(): Promise<DitchMaster[]> {
   }
 }
 
-// 4. 클라우드에서 점검 기록 전체 목록 가져오기 (1회성)
+// 5. 클라우드에서 점검 기록 전체 목록 가져오기 (1회성)
 export async function fetchInspectionsFromCloud(): Promise<InspectionRecord[]> {
   try {
     if (!dbInstance) initFirebase();
@@ -115,10 +132,11 @@ export async function fetchInspectionsFromCloud(): Promise<InspectionRecord[]> {
   }
 }
 
-// 5. ★실시간 양방향 구독 (누군가 등록/점검하면 다른 사람 화면에 1초 만에 자동 반영)
+// 6. ★실시간 양방향 구독 (누군가 등록/점검/수정하면 다른 사람 화면에 1초 만에 자동 반영)
 export function subscribeToCloudUpdates(
   onDitchesUpdate: (ditches: DitchMaster[]) => void,
-  onInspectionsUpdate: (inspections: InspectionRecord[]) => void
+  onInspectionsUpdate: (inspections: InspectionRecord[]) => void,
+  onConnectionStatus?: (connected: boolean) => void
 ) {
   try {
     if (!dbInstance) initFirebase();
@@ -128,13 +146,17 @@ export function subscribeToCloudUpdates(
     const unsubDitches = onSnapshot(
       collection(dbInstance, 'ditches'),
       (snapshot) => {
+        if (onConnectionStatus) onConnectionStatus(true);
         const list: DitchMaster[] = [];
         snapshot.forEach((d) => list.push(d.data() as DitchMaster));
         if (list.length > 0) {
           onDitchesUpdate(list);
         }
       },
-      (err) => console.warn('배수로 실시간 리스너 에러:', err)
+      (err) => {
+        console.warn('배수로 실시간 리스너 에러:', err);
+        if (onConnectionStatus) onConnectionStatus(false);
+      }
     );
 
     // 점검기록 실시간 감지
@@ -144,7 +166,6 @@ export function subscribeToCloudUpdates(
         const list: InspectionRecord[] = [];
         snapshot.forEach((d) => list.push(d.data() as InspectionRecord));
         if (list.length > 0) {
-          // 최신순 정렬
           list.sort((a, b) => b.inspectedAt.localeCompare(a.inspectedAt));
           onInspectionsUpdate(list);
         }
@@ -158,6 +179,7 @@ export function subscribeToCloudUpdates(
     };
   } catch (err) {
     console.warn('실시간 구독 등록 실패:', err);
+    if (onConnectionStatus) onConnectionStatus(false);
     return () => {};
   }
 }
