@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FileSpreadsheet,
   Printer,
@@ -13,11 +13,17 @@ import {
   Calendar,
   Layers,
   MapPin,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { DitchMaster, InspectionRecord, DrainStatus } from '../types';
 import { exportDitchesAndInspectionsToExcel } from '../services/excelExport';
 import { exportAllDataJson, importAllDataJson, resetToDefaultData } from '../services/storage';
 import { PrintReportModal } from './PrintReportModal';
+
+export type SortField = 'code' | 'name' | 'section' | 'currentStatus' | 'lastInspectedAt';
+export type SortDirection = 'asc' | 'desc';
 
 interface AdminDashboardProps {
   ditches: DitchMaster[];
@@ -37,6 +43,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | DrainStatus>('ALL');
   const [sectionFilter, setSectionFilter] = useState<string>('ALL');
   const [onlyEmergency, setOnlyEmergency] = useState<boolean>(false);
+
+  // 테이블 정렬 상태
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // 인쇄 모달 상태
   const [activePrintTarget, setActivePrintTarget] = useState<{
@@ -63,6 +73,102 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     return matchSearch && matchStatus && matchSection && matchEmergency;
   });
+
+  // 정렬 핸들러
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // 동일 컬럼 클릭 시 오름차순/내림차순 토글
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      // 새 컬럼 클릭 시: 상태(주의/긴급순)와 최근 점검일시(최신순)는 내림차순을 기본값으로 시작
+      setSortField(field);
+      if (field === 'currentStatus' || field === 'lastInspectedAt') {
+        setSortDirection('desc');
+      } else {
+        setSortDirection('asc');
+      }
+    }
+  };
+
+  // 정렬된 배수로 목록
+  const sortedDitches = useMemo(() => {
+    if (!sortField) return filteredDitches;
+
+    return [...filteredDitches].sort((a, b) => {
+      // 1. 관리번호
+      if (sortField === 'code') {
+        const comp = a.code.localeCompare(b.code, 'ko', { numeric: true, sensitivity: 'base' });
+        return sortDirection === 'asc' ? comp : -comp;
+      }
+
+      // 2. 현재 상태 (주의/긴급 우선 vs 정상 우선)
+      if (sortField === 'currentStatus') {
+        const statusScore: Record<DrainStatus, number> = {
+          DANGER: 3,
+          WARNING: 2,
+          GOOD: 1,
+        };
+        const scoreA = statusScore[a.currentStatus] || 0;
+        const scoreB = statusScore[b.currentStatus] || 0;
+        if (scoreA !== scoreB) {
+          // desc: DANGER(3) -> WARNING(2) -> GOOD(1) (주의/긴급 우선)
+          // asc: GOOD(1) -> WARNING(2) -> DANGER(3) (정상 우선)
+          return sortDirection === 'desc' ? scoreB - scoreA : scoreA - scoreB;
+        }
+        return a.code.localeCompare(b.code, 'ko', { numeric: true });
+      }
+
+      // 3. 최근 점검일시 (최신순 vs 미점검순)
+      if (sortField === 'lastInspectedAt') {
+        const dateA = a.lastInspectedAt || '';
+        const dateB = b.lastInspectedAt || '';
+
+        if (sortDirection === 'desc') {
+          // 최신순 (최신일자 먼저, 미점검은 맨 아래)
+          if (dateA && !dateB) return -1;
+          if (!dateA && dateB) return 1;
+          if (!dateA && !dateB) return a.code.localeCompare(b.code, 'ko', { numeric: true });
+          return dateB.localeCompare(dateA);
+        } else {
+          // 미점검순 (미점검이 맨 위, 그 다음 오래된 날짜 순)
+          if (!dateA && dateB) return -1;
+          if (dateA && !dateB) return 1;
+          if (!dateA && !dateB) return a.code.localeCompare(b.code, 'ko', { numeric: true });
+          return dateA.localeCompare(dateB);
+        }
+      }
+
+      // 4. 배수로 명칭
+      if (sortField === 'name') {
+        const comp = a.name.localeCompare(b.name, 'ko');
+        return sortDirection === 'asc' ? comp : -comp;
+      }
+
+      // 5. 공구/구역
+      if (sortField === 'section') {
+        const secA = a.section === '주차장' ? '도로' : a.section || '';
+        const secB = b.section === '주차장' ? '도로' : b.section || '';
+        const comp = secA.localeCompare(secB, 'ko');
+        return sortDirection === 'asc' ? comp : -comp;
+      }
+
+      return 0;
+    });
+  }, [filteredDitches, sortField, sortDirection]);
+
+  // 정렬 아이콘 렌더러
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return (
+        <ArrowUpDown className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-colors shrink-0" />
+      );
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-emerald-400 font-bold shrink-0" />
+    );
+  };
 
   // 상태별 통계
   const countGood = ditches.filter((d) => d.currentStatus === 'GOOD').length;
@@ -231,23 +337,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* 긴급조치 토글 필터 */}
-        <div className="flex items-center gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => setOnlyEmergency((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-              onlyEmergency
-                ? 'bg-rose-600 border-rose-400 text-white'
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5 text-rose-300" />
-            긴급조치 대상 배수로만 보기
-          </button>
-          <span className="text-xs text-slate-500">
-            총 {filteredDitches.length}개소 표시 중
-          </span>
+        {/* 긴급조치 토글 필터 & 정렬 안내 */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOnlyEmergency((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
+                onlyEmergency
+                  ? 'bg-rose-600 border-rose-400 text-white shadow'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5 text-rose-300" />
+              긴급조치 대상 배수로만 보기
+            </button>
+            <span className="text-xs text-slate-500">
+              총 {sortedDitches.length}개소 표시 중
+            </span>
+          </div>
+
+          {sortField && (
+            <button
+              type="button"
+              onClick={() => {
+                setSortField(null);
+                setSortDirection('asc');
+              }}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 active:scale-95 transition-all"
+            >
+              <RefreshCw className="w-3 h-3" />
+              정렬 초기화
+            </button>
+          )}
         </div>
       </div>
 
@@ -255,26 +377,102 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider">
+            <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider select-none">
               <tr>
-                <th className="py-3 px-4">관리번호</th>
-                <th className="py-3 px-4">배수로 명칭</th>
-                <th className="py-3 px-4 hidden md:table-cell">공구/구역</th>
+                {/* 관리번호 정렬 */}
+                <th
+                  onClick={() => handleSort('code')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors group"
+                  title="관리번호 오름차순/내림차순 정렬"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'code' ? 'text-emerald-400 font-black' : ''}>
+                      관리번호
+                    </span>
+                    {renderSortIcon('code')}
+                  </div>
+                </th>
+
+                {/* 배수로 명칭 정렬 */}
+                <th
+                  onClick={() => handleSort('name')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors group"
+                  title="배수로 명칭 정렬"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'name' ? 'text-emerald-400 font-black' : ''}>
+                      배수로 명칭
+                    </span>
+                    {renderSortIcon('name')}
+                  </div>
+                </th>
+
+                {/* 공구/구역 정렬 */}
+                <th
+                  onClick={() => handleSort('section')}
+                  className="py-3 px-4 hidden md:table-cell cursor-pointer hover:text-white transition-colors group"
+                  title="공구/구역 정렬"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={sortField === 'section' ? 'text-emerald-400 font-black' : ''}>
+                      공구/구역
+                    </span>
+                    {renderSortIcon('section')}
+                  </div>
+                </th>
+
                 <th className="py-3 px-4 hidden lg:table-cell">단면 규격</th>
-                <th className="py-3 px-4">현재 상태</th>
-                <th className="py-3 px-4 hidden sm:table-cell">최근 점검일시</th>
+
+                {/* 현재 상태 정렬 (주의/긴급 우선 vs 정상 우선) */}
+                <th
+                  onClick={() => handleSort('currentStatus')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors group"
+                  title="현재 상태 정렬 (클릭 시 주의/긴급순 ↔ 정상순 변경)"
+                >
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={sortField === 'currentStatus' ? 'text-emerald-400 font-black' : ''}>
+                      현재 상태
+                    </span>
+                    {sortField === 'currentStatus' && (
+                      <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30">
+                        {sortDirection === 'desc' ? '주의/긴급순' : '정상순'}
+                      </span>
+                    )}
+                    {renderSortIcon('currentStatus')}
+                  </div>
+                </th>
+
+                {/* 최근 점검일시 정렬 (최신순 vs 미점검순) */}
+                <th
+                  onClick={() => handleSort('lastInspectedAt')}
+                  className="py-3 px-4 hidden sm:table-cell cursor-pointer hover:text-white transition-colors group"
+                  title="최근 점검일시 정렬 (클릭 시 최신순 ↔ 미점검순 변경)"
+                >
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={sortField === 'lastInspectedAt' ? 'text-emerald-400 font-black' : ''}>
+                      최근 점검일시
+                    </span>
+                    {sortField === 'lastInspectedAt' && (
+                      <span className="text-[10px] font-black text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-500/30">
+                        {sortDirection === 'desc' ? '최신순' : '미점검순'}
+                      </span>
+                    )}
+                    {renderSortIcon('lastInspectedAt')}
+                  </div>
+                </th>
+
                 <th className="py-3 px-4 text-center">리포트 및 이동</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 font-medium">
-              {filteredDitches.length === 0 ? (
+              {sortedDitches.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-500 font-bold">
                     검색 조건에 일치하는 배수로가 없습니다.
                   </td>
                 </tr>
               ) : (
-                filteredDitches.map((ditch) => {
+                sortedDitches.map((ditch) => {
                   const ditchInspections = inspections.filter((i) => i.ditchId === ditch.id);
                   const hasInspection = ditchInspections.length > 0;
 
@@ -284,18 +482,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       className="hover:bg-slate-850 transition-colors group"
                     >
                       <td className="py-3 px-4 font-mono font-bold text-slate-300">
-                        {ditch.code}
+                        {ditch.code.replace(/주차장/g, '도로')}
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-bold text-white group-hover:text-emerald-400 transition-colors">
-                          {ditch.name}
+                          {ditch.name.replace(/주차장/g, '도로')}
                         </div>
                         <div className="text-[11px] text-slate-400 truncate max-w-xs">
                           {ditch.address || '-'}
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-300 hidden md:table-cell">
-                        {ditch.section}
+                        {ditch.section === '주차장' ? '도로' : ditch.section}
                       </td>
                       <td className="py-3 px-4 text-slate-400 font-mono text-xs hidden lg:table-cell">
                         {ditch.dimension}
