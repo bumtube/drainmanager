@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Flame,
   CheckCircle2,
+  Camera,
   X,
   ExternalLink,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ interface MapViewProps {
   selectedDitch: DitchMaster | null;
   onSelectDitch: (ditch: DitchMaster | null) => void;
   onStartInspection: (ditch: DitchMaster) => void;
+  onOpenInspectionForm?: (ditch: DitchMaster) => void;
   onViewHistory: (ditch: DitchMaster) => void;
   onAddNewDitch: () => void;
   onEditDitch: (ditch: DitchMaster) => void;
@@ -39,6 +41,7 @@ export const MapView: React.FC<MapViewProps> = ({
   selectedDitch,
   onSelectDitch,
   onStartInspection,
+  onOpenInspectionForm,
   onViewHistory,
   onAddNewDitch,
   onEditDitch,
@@ -57,11 +60,11 @@ export const MapView: React.FC<MapViewProps> = ({
   // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('streets');
 
-  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (반경 약 600m 제한)
+  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (반경 300m 정밀 제한)
   const FACILITY_CENTER: [number, number] = [37.357515, 127.112388];
   const FACILITY_BOUNDS = L.latLngBounds(
-    [37.3510, 127.1050], // 남서쪽 (SW)
-    [37.3640, 127.1200]  // 북동쪽 (NE)
+    [37.3548, 127.1090], // 남서쪽 (SW: 반경 300m)
+    [37.3602, 127.1158]  // 북동쪽 (NE: 반경 300m)
   );
 
   // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
@@ -178,7 +181,7 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
       zoom: 18,
-      minZoom: 16, // 최소 축소 제한 (복지관 부지 및 주변 도로 전경)
+      minZoom: 17, // 최소 축소 제한 (복지관 부지 반경 300m)
       maxZoom: 19, // 최대 확대 제한 (정밀 배수로/수목 점검)
       maxBounds: FACILITY_BOUNDS, // 부지 밖 이동 차단 (투명 울타리)
       maxBoundsViscosity: 1.0, // 경계에 도달 시 단단하게 튕겨나옴
@@ -404,7 +407,7 @@ export const MapView: React.FC<MapViewProps> = ({
             className="pointer-events-auto bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-700 text-white px-3 py-2 rounded-xl shadow-xl flex items-center gap-1.5 text-xs font-bold active:scale-95 transition-all"
           >
             <Layers className="w-4 h-4 text-emerald-400" />
-            {mapType === 'streets' ? '일반지도 (기본)' : '위성지도'}
+            {mapType === 'streets' ? '일반지도' : '위성지도'}
           </button>
         </div>
 
@@ -506,7 +509,7 @@ export const MapView: React.FC<MapViewProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-                  {selectedDitch.code}
+                  {selectedDitch.code.replace(/주차장/g, '도로')}
                 </span>
                 <span
                   className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
@@ -555,15 +558,28 @@ export const MapView: React.FC<MapViewProps> = ({
 
             {/* 액션 버튼 그룹 */}
             {userRole === 'INSPECTOR' ? (
-              // [주사님 모드]: 대형 점검 시작 버튼 (최소 56px) + 이력 보기
+              // [주사님 모드]: 현장 점검칸과 촬영칸으로 명확히 분리
               <div className="space-y-2 pt-1">
-                <button
-                  onClick={() => onStartInspection(selectedDitch)}
-                  className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg rounded-xl flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-950/60 active:scale-95 transition-all"
-                >
-                  <Play className="w-6 h-6 fill-current" />
-                  현장 점검 및 촬영 시작
-                </button>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={() =>
+                      onOpenInspectionForm
+                        ? onOpenInspectionForm(selectedDitch)
+                        : onStartInspection(selectedDitch)
+                    }
+                    className="h-14 bg-blue-600 hover:bg-blue-500 text-white font-black text-base rounded-xl flex items-center justify-center gap-2 shadow-xl shadow-blue-950/60 active:scale-95 transition-all"
+                  >
+                    <CheckCircle2 className="w-5 h-5 text-blue-200" />
+                    현장 점검
+                  </button>
+                  <button
+                    onClick={() => onStartInspection(selectedDitch)}
+                    className="h-14 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-base rounded-xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-950/60 active:scale-95 transition-all"
+                  >
+                    <Camera className="w-5 h-5" />
+                    현장 촬영
+                  </button>
+                </div>
                 <button
                   onClick={() => onViewHistory(selectedDitch)}
                   className="w-full h-11 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700"
@@ -573,22 +589,33 @@ export const MapView: React.FC<MapViewProps> = ({
                 </button>
               </div>
             ) : (
-              // [관리자 모드]: 수정, 점검, 이력
+              // [관리자 모드]: 점검, 촬영, 수정 분리
               <div className="space-y-2 pt-1">
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() =>
+                      onOpenInspectionForm
+                        ? onOpenInspectionForm(selectedDitch)
+                        : onStartInspection(selectedDitch)
+                    }
+                    className="h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1 active:scale-95"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    점검
+                  </button>
                   <button
                     onClick={() => onStartInspection(selectedDitch)}
-                    className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 active:scale-95"
+                    className="h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1 active:scale-95"
                   >
-                    <Play className="w-4 h-4 fill-current" />
-                    점검 수행
+                    <Camera className="w-4 h-4" />
+                    촬영
                   </button>
                   <button
                     onClick={() => onEditDitch(selectedDitch)}
-                    className="flex-1 h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 active:scale-95"
+                    className="h-12 bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1 border border-slate-700 active:scale-95"
                   >
                     <Edit className="w-4 h-4" />
-                    제원/좌표 수정
+                    수정
                   </button>
                 </div>
                 <button

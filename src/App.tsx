@@ -208,10 +208,17 @@ export const App: React.FC = () => {
     setSelectedDitch(null);
   };
 
-  // 점검 시작 버튼 클릭 -> 고스트 카메라 열기
+  // 촬영 시작 버튼 클릭 -> 고스트 카메라 열기
   const handleStartInspection = (ditch: DitchMaster) => {
     setSelectedDitch(ditch);
     setIsCameraOpen(true);
+  };
+
+  // 현장 점검 폼 바로 열기 (체크리스트 작성)
+  const handleOpenInspectionForm = (ditch: DitchMaster) => {
+    setSelectedDitch(ditch);
+    setCapturedPhotoUrl('');
+    setIsQuickFormOpen(true);
   };
 
   // 고스트 카메라 촬영 완료 -> 원터치 점검 폼으로 전달
@@ -349,6 +356,7 @@ export const App: React.FC = () => {
             selectedDitch={selectedDitch}
             onSelectDitch={setSelectedDitch}
             onStartInspection={handleStartInspection}
+            onOpenInspectionForm={handleOpenInspectionForm}
             onViewHistory={(ditch) => {
               setSelectedDitch(ditch);
               setIsHistoryOpen(true);

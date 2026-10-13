@@ -134,7 +134,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
       structureStatus,
       urgencyLevel,
       memo: memo.trim(),
-      photoCurrentUrl: capturedPhotoUrl,
+      photoCurrentUrl: capturedPhotoUrl || previousPhotoUrl || '',
       photoPreviousUrl: previousPhotoUrl,
       gpsAccuracy: gpsAccuracy || 3.0,
       latitude: ditch.latitude,
@@ -214,14 +214,28 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
 
             {/* 금회 사진 */}
             <div className="relative rounded-xl overflow-hidden bg-slate-950 border-2 border-emerald-500 aspect-video flex items-center justify-center">
-              <img
-                src={capturedPhotoUrl}
-                alt="금회 점검 사진"
-                className="w-full h-full object-cover"
-              />
-              <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                금회 촬영 (NEW)
-              </span>
+              {capturedPhotoUrl ? (
+                <>
+                  <img
+                    src={capturedPhotoUrl}
+                    alt="금회 점검 사진"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                    금회 촬영 (NEW)
+                  </span>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onRetakePhoto}
+                  className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-900 transition-all active:scale-95 p-2 text-center"
+                >
+                  <Camera className="w-6 h-6 text-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold text-slate-300">현장 사진 촬영하기</span>
+                  <span className="text-[10px] text-slate-500">(터치 시 카메라 실행)</span>
+                </button>
+              )}
             </div>
           </div>
 
