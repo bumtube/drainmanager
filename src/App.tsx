@@ -267,7 +267,20 @@ export const App: React.FC = () => {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans select-none">
       {/* 1. 최상단 네비게이션 헤더 */}
       <header className="h-14 bg-slate-900 border-b border-slate-800 px-3 sm:px-4 flex items-center justify-between z-20 shadow-md">
-        <div className="flex items-center gap-2">
+        {/* 좌측 로고 및 앱 타이틀 (클릭 시 메인 첫 화면인 현장 지도로 이동) */}
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentView('map');
+            setSelectedDitch(null);
+            setIsQuickFormOpen(false);
+            setIsHistoryOpen(false);
+            setIsCameraOpen(false);
+            setIsDitchEditOpen(false);
+          }}
+          className="flex items-center gap-2 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-left focus:outline-none"
+          title="메인 첫 화면(현장 지도)으로 이동"
+        >
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 font-black text-sm shadow">
             DM
           </div>
@@ -279,7 +292,7 @@ export const App: React.FC = () => {
               </span>
             </h1>
           </div>
-        </div>
+        </button>
 
         {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 전환) */}
         {userRole === 'ADMIN' && (
