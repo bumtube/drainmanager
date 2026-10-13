@@ -79,19 +79,28 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  // 워터마크 합성 유틸 함수
+  // 워터마크 합성 유틸 함수 (클라우드 1MB 제한을 위한 고효율 리사이징)
   const applyWatermarkAndOutput = (
     source: HTMLVideoElement | HTMLImageElement,
-    width: number,
-    height: number
+    rawWidth: number,
+    rawHeight: number
   ): string => {
+    // 가로 최대 960px로 최적화 리사이징 (선명도는 유지하고 용량을 150KB로 압축)
+    const MAX_WIDTH = 960;
+    let width = rawWidth;
+    let height = rawHeight;
+    if (width > MAX_WIDTH) {
+      height = Math.round((height * MAX_WIDTH) / width);
+      width = MAX_WIDTH;
+    }
+
     const canvas = canvasRef.current || document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    // 1. 원본 이미지 그리기
+    // 1. 원본 이미지 리사이징 그리기
     ctx.drawImage(source, 0, 0, width, height);
 
     // 2. 워터마크 텍스트 준비
@@ -111,8 +120,8 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     const line3 = `위치: N ${lat}, E ${lng}${acc}`;
 
     // 3. 고대비 워터마크 박스 (하단 배경 반투명 블랙)
-    const boxHeight = Math.max(90, Math.floor(height * 0.12));
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    const boxHeight = Math.max(80, Math.floor(height * 0.14));
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
     ctx.fillRect(0, height - boxHeight, width, boxHeight);
 
     // 상단 포인트 라인
@@ -120,23 +129,24 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     ctx.fillRect(0, height - boxHeight, width, 4);
 
     // 4. 텍스트 각인
-    const fontSize = Math.max(16, Math.floor(width * 0.022));
+    const fontSize = Math.max(15, Math.floor(width * 0.024));
     ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${fontSize}px "Pretendard", -apple-system, sans-serif`;
     ctx.textBaseline = 'middle';
 
-    const paddingX = 24;
-    const startY = height - boxHeight + 24;
-    const lineHeight = (boxHeight - 34) / 2;
+    const paddingX = 20;
+    const startY = height - boxHeight + 20;
+    const lineHeight = (boxHeight - 30) / 2;
 
     ctx.fillText(line1, paddingX, startY);
     ctx.fillStyle = '#cbd5e1';
-    ctx.font = `${fontSize * 0.9}px "Pretendard", -apple-system, sans-serif`;
+    ctx.font = `${fontSize * 0.88}px "Pretendard", -apple-system, sans-serif`;
     ctx.fillText(line2, paddingX, startY + lineHeight);
     ctx.fillStyle = '#38bdf8';
     ctx.fillText(line3, paddingX, startY + lineHeight * 2);
 
-    return canvas.toDataURL('image/jpeg', 0.88);
+    // JPEG 0.72 압축: 화질은 선명하게 유지되며 파일 용량은 약 100~150KB로 최적화됨 (Firestore 1MB 한도 통과)
+    return canvas.toDataURL('image/jpeg', 0.72);
   };
 
   // 셔터 캡처

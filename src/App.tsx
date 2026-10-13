@@ -19,7 +19,12 @@ import {
   getUserSession,
   saveUserSession,
 } from './services/storage';
-import { initFirebase } from './services/firebase';
+import {
+  initFirebase,
+  subscribeToCloudUpdates,
+  syncDitchToCloud,
+  syncInspectionToCloud,
+} from './services/firebase';
 import { MapView } from './components/MapView';
 import { GhostCamera } from './components/GhostCamera';
 import { QuickInspectionForm } from './components/QuickInspectionForm';
@@ -81,6 +86,20 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadData();
     initFirebase();
+
+    // 실시간 클라우드 동기화: 다른 사람이 점검/등록하면 내 화면에도 실시간 자동 반영
+    const unsubscribe = subscribeToCloudUpdates(
+      (cloudDitches) => {
+        setDitches(cloudDitches);
+      },
+      (cloudInspections) => {
+        setInspections(cloudInspections);
+      }
+    );
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // GPS 에러 메시지 및 권한 상태
@@ -177,6 +196,7 @@ export const App: React.FC = () => {
   // 배수로 신규 등록/수정 완료
   const handleSaveDitch = async (ditch: DitchMaster) => {
     await saveDitch(ditch);
+    await syncDitchToCloud(ditch);
     await loadData();
     setSelectedDitch(ditch);
   };
@@ -205,13 +225,20 @@ export const App: React.FC = () => {
   // 원터치 점검 폼 저장 완료
   const handleSaveInspection = async (record: InspectionRecord) => {
     await saveInspection(record);
+    // 클라우드 Firestore에 즉시 동기화
+    await syncInspectionToCloud(record);
+    
+    // 배수로 마스터의 최신 상태도 클라우드에 즉시 동기화
+    const updatedDitches = await getDitches();
+    const updatedTarget = updatedDitches.find((d) => d.id === record.ditchId);
+    if (updatedTarget) {
+      await syncDitchToCloud(updatedTarget);
+      setSelectedDitch(updatedTarget);
+    }
+
     await loadData();
     setIsQuickFormOpen(false);
     setCapturedPhotoUrl('');
-    // 갱신된 배수로 선택 상태 유지
-    const updatedDitches = await getDitches();
-    const updatedTarget = updatedDitches.find((d) => d.id === record.ditchId);
-    if (updatedTarget) setSelectedDitch(updatedTarget);
   };
 
   // 대시보드에서 배수로 지도 이동
