@@ -11,8 +11,8 @@ interface DitchEditModalProps {
   onClose: () => void;
 }
 
-// 현장 맞춤형 3개 구역
-const SECTIONS = ['주차장', '본관', '별관'] as const;
+// 현장 맞춤형 4개 구역 (도로, 본관, 별관, 식수)
+const SECTIONS = ['도로', '본관', '별관', '식수'] as const;
 
 export const DitchEditModal: React.FC<DitchEditModalProps> = ({
   ditch,
@@ -24,10 +24,14 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
 }) => {
   const isNew = !ditch;
 
-  // 1. 구역 선택 (주차장, 본관, 별관)
-  const [section, setSection] = useState<string>(
-    ditch?.section && SECTIONS.includes(ditch.section as any) ? ditch.section : '주차장'
-  );
+  // 1. 구역 선택 (도로, 본관, 별관, 식수)
+  const initialSection =
+    ditch?.section === '주차장'
+      ? '도로'
+      : ditch?.section && SECTIONS.includes(ditch.section as any)
+      ? ditch.section
+      : '도로';
+  const [section, setSection] = useState<string>(initialSection);
 
   // 구역별 다음 번호 자동 계산 유틸
   const getNextNumberForSection = (sec: string): number => {
@@ -87,16 +91,17 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
 
-    // 명칭: "주차장-1", "본관-2" 형태로 명확하게 생성
+    // 명칭: "도로-1", "본관-2", "식수-1" 형태로 명확하게 생성
     const autoName = `${section}-${ditchNumber}`;
     const autoCode = `DRAIN-${section}-${ditchNumber}`;
+    const defaultDim = section === '식수' ? '조경 수목 주변 배수' : '표준 U형 배수로';
 
     const item: DitchMaster = {
       id: ditch?.id || `ditch-${section}-${ditchNumber}-${Date.now()}`,
       code: autoCode,
       name: autoName,
       section: section,
-      dimension: ditch?.dimension || '표준 U형 배수로',
+      dimension: ditch?.dimension || defaultDim,
       latitude,
       longitude,
       currentStatus,
@@ -158,7 +163,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
               </span>
               구역 선택
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
               {SECTIONS.map((sec) => {
                 const selected = section === sec;
                 return (
@@ -166,14 +171,18 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                     key={sec}
                     type="button"
                     onClick={() => handleSelectSection(sec)}
-                    className={`min-h-[52px] rounded-xl font-black text-sm border-2 transition-all flex items-center justify-center gap-1 active:scale-95 ${
+                    className={`min-h-[50px] px-1 rounded-xl font-black text-xs sm:text-sm border-2 transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
                       selected
-                        ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-950'
+                        ? sec === '식수'
+                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-950'
+                          : 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-950'
                         : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
                     }`}
                   >
-                    {selected && <Check className="w-4 h-4" />}
-                    {sec}
+                    <div className="flex items-center gap-1">
+                      {selected && <Check className="w-3.5 h-3.5" />}
+                      <span>{sec === '식수' ? '🌲 식수' : sec}</span>
+                    </div>
                   </button>
                 );
               })}

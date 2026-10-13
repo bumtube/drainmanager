@@ -44,8 +44,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     inspection: InspectionRecord;
   } | null>(null);
 
-  // 구역 목록
-  const sections = Array.from(new Set(ditches.map((d) => d.section)));
+  // 구역 목록 ('주차장' -> '도로' 변환 반영)
+  const sections = Array.from(
+    new Set(ditches.map((d) => (d.section === '주차장' ? '도로' : d.section || '도로')))
+  );
 
   // 필터링된 배수로 목록
   const filteredDitches = ditches.filter((d) => {
@@ -55,7 +57,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       (d.address && d.address.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchStatus = statusFilter === 'ALL' || d.currentStatus === statusFilter;
-    const matchSection = sectionFilter === 'ALL' || d.section === sectionFilter;
+    const currentSection = d.section === '주차장' ? '도로' : d.section;
+    const matchSection = sectionFilter === 'ALL' || currentSection === sectionFilter;
     const matchEmergency = !onlyEmergency || d.currentStatus === 'DANGER';
 
     return matchSearch && matchStatus && matchSection && matchEmergency;

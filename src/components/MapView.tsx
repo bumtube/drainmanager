@@ -57,7 +57,21 @@ export const MapView: React.FC<MapViewProps> = ({
   // 지도 타일 종류: 'satellite' | 'streets'
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('satellite');
 
-  // SVG/HTML 마커 생성 유틸 (이전 클래식 원형 핀 마커 + 배수로 번호 표시)
+  // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
+  const [selectedSection, setSelectedSection] = useState<string>('ALL');
+
+  // 구역 명칭 정규화 유틸 ('주차장' -> '도로' 변환 및 '식수' 감지)
+  const getNormalizedSection = (d: DitchMaster): string => {
+    const s = d.section || '';
+    const n = d.name || '';
+    if (s === '식수' || n.includes('식수')) return '식수';
+    if (s === '본관' || n.includes('본관')) return '본관';
+    if (s === '별관' || n.includes('별관')) return '별관';
+    if (s === '도로' || s === '주차장' || n.includes('도로') || n.includes('주차장')) return '도로';
+    return s || '도로';
+  };
+
+  // SVG/HTML 마커 생성 유틸 (추천 3번: 미니 구역 꼬리표 라벨 + 원형 핀 마커 + 번호/식수 나무아이콘)
   const createCustomMarkerIcon = (ditch: DitchMaster, isSelected: boolean, isDraggable: boolean) => {
     let pinColor = '#16a34a'; // GOOD: 초록 (정상)
     let borderColor = '#14532d';
@@ -72,30 +86,61 @@ export const MapView: React.FC<MapViewProps> = ({
 
     const scale = isSelected ? 'scale-125 z-50' : 'scale-100';
 
-    // 배수로 명칭에서 번호(숫자) 추출 (예: '주차장-1' -> '1', '본관-2' -> '2', '3' -> '3')
+    // 구역 확인 및 식수(나무) 여부 판별
+    const section = getNormalizedSection(ditch);
+    const isTree = section === '식수';
+
+    // 배수로 명칭에서 번호(숫자) 추출 (예: '도로-1' -> '1', '본관-2' -> '2', '식수-3' -> '3')
     const match = ditch.name?.match(/\d+/);
     const ditchNumber = match ? match[0] : (ditch.name || '1');
-    const textSize = ditchNumber.length > 2 ? 'text-[11px]' : ditchNumber.length === 2 ? 'text-[13px]' : 'text-[15px]';
+
+    // 추천 3번: 핀 머리 위 미니 구역 꼬리표 라벨 스타일
+    const badgeStyle = isTree
+      ? 'bg-emerald-950/95 border-emerald-500/80 text-emerald-200'
+      : 'bg-slate-950/95 border-slate-600 text-slate-100';
+
+    // 핀 내부 콘텐츠 (식수일 경우 나무 아이콘 🌲, 일반 배수로는 큰 숫자)
+    let innerContent = '';
+    if (isTree) {
+      innerContent = `
+        <div class="flex items-center justify-center leading-none text-white select-none">
+          <span class="text-base select-none">🌲</span>
+          <span class="text-[11px] font-black ml-0.5">${ditchNumber}</span>
+        </div>
+      `;
+    } else {
+      const textSize =
+        ditchNumber.length > 2 ? 'text-[11px]' : ditchNumber.length === 2 ? 'text-[13px]' : 'text-[15px]';
+      innerContent = `<span class="${textSize} font-black leading-none">${ditchNumber}</span>`;
+    }
 
     const html = `
-      <div class="relative flex items-center justify-center transform transition-transform duration-200 ${scale}">
-        <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white ${textSize} font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''}">
-          ${ditchNumber}
+      <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
+        <!-- 추천 3번: 핀 머리 위 미니 구역 꼬리표 라벨 -->
+        <div style="box-shadow: 0 2px 6px rgba(0,0,0,0.6);" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
+          ${isTree ? '🌲 ' : ''}${section}
         </div>
-        ${
-          isDraggable
-            ? '<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white shadow"></span>'
-            : ''
-        }
-        <div style="border-top-color: ${pinColor};" class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]"></div>
+
+        <!-- 클래식 원형 핀 마커 본체 -->
+        <div class="relative flex items-center justify-center">
+          <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''}">
+            ${innerContent}
+          </div>
+          ${
+            isDraggable
+              ? '<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white shadow"></span>'
+              : ''
+          }
+          <div style="border-top-color: ${pinColor};" class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]"></div>
+        </div>
       </div>
     `;
 
     return L.divIcon({
       html,
       className: 'custom-ditch-pin',
-      iconSize: [36, 44],
-      iconAnchor: [18, 44],
+      iconSize: [48, 62],
+      iconAnchor: [24, 62],
     });
   };
 
@@ -188,7 +233,13 @@ export const MapView: React.FC<MapViewProps> = ({
 
     markersLayerRef.current.clearLayers();
 
-    ditches.forEach((ditch) => {
+    // 선택된 구역 필터링 적용 (전체 / 도로 / 본관 / 별관 / 식수)
+    const filteredDitches = ditches.filter((ditch) => {
+      if (selectedSection === 'ALL') return true;
+      return getNormalizedSection(ditch) === selectedSection;
+    });
+
+    filteredDitches.forEach((ditch) => {
       const isSelected = selectedDitch?.id === ditch.id;
       const isDraggable = userRole === 'ADMIN'; // 관리자만 핀 위치 드래그 수정 허용
 
@@ -206,7 +257,7 @@ export const MapView: React.FC<MapViewProps> = ({
       // 마우스 오버 / 길게 누를 때 배수로 전체 명칭 툴팁 표시
       marker.bindTooltip(ditch.name || '배수로', {
         direction: 'top',
-        offset: [0, -22],
+        offset: [0, -28],
       });
 
       // 관리자 핀 드래그 종료 이벤트 -> 좌표 자동 미세조정 저장
@@ -219,7 +270,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       marker.addTo(markersLayerRef.current!);
     });
-  }, [ditches, selectedDitch, userRole]);
+  }, [ditches, selectedDitch, userRole, selectedSection]);
 
   const hasCenteredOnUserRef = useRef<boolean>(false);
   const [showGpsHelpModal, setShowGpsHelpModal] = useState<boolean>(false);
@@ -344,6 +395,40 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         </div>
 
+        {/* 5. 구역 선택 필터 메뉴 (전체 / 도로 / 본관 / 별관 / 식수) */}
+        <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-0.5 px-0.5 no-scrollbar">
+          {(['ALL', '도로', '본관', '별관', '식수'] as const).map((sec) => {
+            const isCurrent = selectedSection === sec;
+            const count =
+              sec === 'ALL'
+                ? ditches.length
+                : ditches.filter((d) => getNormalizedSection(d) === sec).length;
+            const label = sec === 'ALL' ? '전체' : sec === '식수' ? '🌲 식수' : sec;
+
+            return (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => setSelectedSection(sec)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
+                  isCurrent
+                    ? 'bg-blue-600 text-white border-blue-400 shadow-blue-950/80 ring-2 ring-blue-400/40'
+                    : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
+                }`}
+              >
+                <span>{label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                    isCurrent ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* 카카오톡 브라우저 감지 시 안내 배너 */}
         {isKakaoTalk && (
           <div className="pointer-events-auto bg-amber-500 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-black shadow-lg flex items-center justify-between animate-pulse">
@@ -356,7 +441,7 @@ export const MapView: React.FC<MapViewProps> = ({
       </div>
 
       {/* 3. 우측 컨트롤 버튼 (내 위치로 이동, 줌 등) */}
-      <div className="absolute right-3 top-20 z-10 flex flex-col gap-2.5">
+      <div className="absolute right-3 top-28 sm:top-24 z-10 flex flex-col gap-2.5">
         <button
           onClick={handlePanToCurrentLocation}
           className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
@@ -426,8 +511,18 @@ export const MapView: React.FC<MapViewProps> = ({
 
             {/* 배수로 명칭 및 제원 정보 */}
             <div>
-              <h3 className="text-lg font-black text-white">{selectedDitch.name}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">{selectedDitch.address || selectedDitch.section}</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-white">
+                  {getNormalizedSection(selectedDitch) === '식수' ? '🌲 ' : ''}
+                  {selectedDitch.name.replace(/주차장/g, '도로')}
+                </h3>
+                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                  {getNormalizedSection(selectedDitch)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {(selectedDitch.address || selectedDitch.section || '').replace(/주차장/g, '도로')}
+              </p>
               <div className="flex gap-3 text-[11px] text-slate-300 mt-1 font-medium">
                 <span>규격: {selectedDitch.dimension}</span>
                 <span>•</span>

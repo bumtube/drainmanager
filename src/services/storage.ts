@@ -18,6 +18,34 @@ export async function getDitches(): Promise<DitchMaster[]> {
       await set(INSPECTIONS_KEY, INITIAL_INSPECTIONS);
       return INITIAL_DITCHES;
     }
+
+    // '주차장' -> '도로' 자동 마이그레이션 적용
+    let hasChanges = false;
+    data = data.map((d) => {
+      if (
+        d.section === '주차장' ||
+        d.name.includes('주차장') ||
+        d.code.includes('주차장') ||
+        (d.address && d.address.includes('주차장')) ||
+        (d.memo && d.memo.includes('주차장'))
+      ) {
+        hasChanges = true;
+        return {
+          ...d,
+          section: d.section === '주차장' ? '도로' : d.section,
+          name: d.name.replace(/주차장/g, '도로'),
+          code: d.code.replace(/주차장/g, '도로'),
+          address: d.address ? d.address.replace(/주차장/g, '도로') : d.address,
+          memo: d.memo ? d.memo.replace(/주차장/g, '도로') : d.memo,
+        };
+      }
+      return d;
+    });
+
+    if (hasChanges) {
+      await set(DITCHES_KEY, data);
+    }
+
     return data;
   } catch (error) {
     console.error('Failed to load ditches from IndexedDB:', error);
