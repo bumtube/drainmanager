@@ -57,9 +57,9 @@ export const MapView: React.FC<MapViewProps> = ({
   // 지도 타일 종류: 'satellite' | 'streets'
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('satellite');
 
-  // SVG/HTML 마커 생성 유틸 (지도 핀에 배수로 번호/명칭 직접 표시)
+  // SVG/HTML 마커 생성 유틸 (이전 클래식 원형 핀 마커 + 배수로 번호 표시)
   const createCustomMarkerIcon = (ditch: DitchMaster, isSelected: boolean, isDraggable: boolean) => {
-    let pinColor = '#16a34a'; // GOOD: 초록
+    let pinColor = '#16a34a'; // GOOD: 초록 (정상)
     let borderColor = '#14532d';
 
     if (ditch.currentStatus === 'WARNING') {
@@ -70,28 +70,32 @@ export const MapView: React.FC<MapViewProps> = ({
       borderColor = '#7f1d1d';
     }
 
-    const scale = isSelected ? 'scale-125 z-50 ring-4 ring-white' : 'scale-100';
-    const displayName = ditch.name || '배수로';
+    const scale = isSelected ? 'scale-125 z-50' : 'scale-100';
+
+    // 배수로 명칭에서 번호(숫자) 추출 (예: '주차장-1' -> '1', '본관-2' -> '2', '3' -> '3')
+    const match = ditch.name?.match(/\d+/);
+    const ditchNumber = match ? match[0] : (ditch.name || '1');
+    const textSize = ditchNumber.length > 2 ? 'text-[11px]' : ditchNumber.length === 2 ? 'text-[13px]' : 'text-[15px]';
 
     const html = `
-      <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
-        <div style="background-color: ${pinColor}; border: 2px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="px-2.5 py-1 rounded-full flex items-center justify-center text-white text-[12px] font-black tracking-tight whitespace-nowrap min-w-[50px]">
-          ${displayName}
+      <div class="relative flex items-center justify-center transform transition-transform duration-200 ${scale}">
+        <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white ${textSize} font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''}">
+          ${ditchNumber}
         </div>
         ${
           isDraggable
             ? '<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white shadow"></span>'
             : ''
         }
-        <div style="border-top-color: ${pinColor};" class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[7px] -mt-[1px]"></div>
+        <div style="border-top-color: ${pinColor};" class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]"></div>
       </div>
     `;
 
     return L.divIcon({
       html,
       className: 'custom-ditch-pin',
-      iconSize: [64, 36],
-      iconAnchor: [32, 34],
+      iconSize: [36, 44],
+      iconAnchor: [18, 44],
     });
   };
 
@@ -197,6 +201,12 @@ export const MapView: React.FC<MapViewProps> = ({
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
         onSelectDitch(ditch);
+      });
+
+      // 마우스 오버 / 길게 누를 때 배수로 전체 명칭 툴팁 표시
+      marker.bindTooltip(ditch.name || '배수로', {
+        direction: 'top',
+        offset: [0, -22],
       });
 
       // 관리자 핀 드래그 종료 이벤트 -> 좌표 자동 미세조정 저장
