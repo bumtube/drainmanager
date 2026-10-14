@@ -109,29 +109,48 @@ export const MapView: React.FC<MapViewProps> = ({
       ? 'bg-emerald-950/95 border-emerald-500/80 text-emerald-200'
       : 'bg-slate-950/95 border-slate-600 text-slate-100';
 
-    // 핀 내부 콘텐츠 (식수일 경우 나무 아이콘 🌲, 일반 배수로는 큰 숫자)
-    let innerContent = '';
+    // 마커 본체: 식수 구역은 하얀 식수(나무 실루엣 외곽선) 안에 녹색면과 하얀 글씨 숫자만 표시, 일반 배수로는 클래식 원형 핀
+    let markerBody = '';
     if (isTree) {
-      innerContent = `
-        <div class="flex items-center justify-center leading-none text-white select-none">
-          <span class="text-base select-none">🌲</span>
-          <span class="text-[11px] font-black ml-0.5">${ditchNumber}</span>
+      const fontSize = ditchNumber.length > 2 ? '10.5' : ditchNumber.length === 2 ? '13.5' : '15';
+      const selectionFilter = isSelected
+        ? 'filter: drop-shadow(0 0 6px #facc15) drop-shadow(0 4px 8px rgba(0,0,0,0.5));'
+        : 'filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));';
+
+      markerBody = `
+        <div class="relative flex items-center justify-center">
+          <svg width="42" height="44" viewBox="0 0 42 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="${selectionFilter}">
+            <!-- 하얀 식수 외곽 테두리 (white tree silhouette) + 녹색면 (green surface) -->
+            <path d="M 21 2
+                     L 29.5 11 L 26 11.5
+                     L 34.5 20.5 L 30 21
+                     L 39 31.5 L 24.5 31.5
+                     L 24.5 44 L 17.5 44
+                     L 17.5 31.5 L 3 31.5
+                     L 12 21 L 7.5 20.5
+                     L 16 11.5 L 12.5 11
+                     Z"
+                  fill="${pinColor}"
+                  stroke="#ffffff"
+                  stroke-width="2.8"
+                  stroke-linejoin="round"
+                  stroke-linecap="round" />
+            <!-- 하얀 글씨로 숫자만 큼직하게 표시 -->
+            <text x="21" y="22" fill="#ffffff" font-size="${fontSize}" font-weight="900" font-family="system-ui, -apple-system, sans-serif" text-anchor="middle" dominant-baseline="central" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));">${ditchNumber}</text>
+          </svg>
+          ${
+            isDraggable
+              ? '<span class="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-500 rounded-full border-2 border-white shadow"></span>'
+              : ''
+          }
         </div>
       `;
     } else {
       const textSize =
         ditchNumber.length > 2 ? 'text-[11px]' : ditchNumber.length === 2 ? 'text-[13px]' : 'text-[15px]';
-      innerContent = `<span class="${textSize} font-black leading-none">${ditchNumber}</span>`;
-    }
+      const innerContent = `<span class="${textSize} font-black leading-none">${ditchNumber}</span>`;
 
-    const html = `
-      <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
-        <!-- 추천 3번: 핀 머리 위 미니 구역 꼬리표 라벨 -->
-        <div style="box-shadow: 0 2px 6px rgba(0,0,0,0.6);" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
-          ${isTree ? '🌲 ' : ''}${section}
-        </div>
-
-        <!-- 클래식 원형 핀 마커 본체 -->
+      markerBody = `
         <div class="relative flex items-center justify-center">
           <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''}">
             ${innerContent}
@@ -143,6 +162,17 @@ export const MapView: React.FC<MapViewProps> = ({
           }
           <div style="border-top-color: ${pinColor};" class="absolute -bottom-2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]"></div>
         </div>
+      `;
+    }
+
+    const html = `
+      <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
+        <!-- 추천 3번: 핀 머리 위 미니 구역 꼬리표 라벨 -->
+        <div style="box-shadow: 0 2px 6px rgba(0,0,0,0.6);" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
+          ${isTree ? '🌲 ' : ''}${section}
+        </div>
+
+        ${markerBody}
       </div>
     `;
 
