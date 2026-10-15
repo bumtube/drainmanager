@@ -38,6 +38,8 @@ interface MapViewProps {
   alerts?: EmergencyAlert[];
   onCreateAlert?: (lat: number, lng: number, message?: string) => Promise<void> | void;
   onDeleteAlert?: (alertId: string) => Promise<void> | void;
+  selectedAlert?: EmergencyAlert | null;
+  onSelectAlert?: (alert: EmergencyAlert | null) => void;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -57,6 +59,8 @@ export const MapView: React.FC<MapViewProps> = ({
   alerts = [],
   onCreateAlert,
   onDeleteAlert,
+  selectedAlert: externalSelectedAlert,
+  onSelectAlert,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -67,7 +71,12 @@ export const MapView: React.FC<MapViewProps> = ({
   const userCircleRef = useRef<L.Circle | null>(null);
 
   // 긴급상황 경광등 핀 선택 및 생성 로딩 상태
-  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
+  const [internalSelectedAlert, setInternalSelectedAlert] = useState<EmergencyAlert | null>(null);
+  const selectedAlert = externalSelectedAlert !== undefined ? externalSelectedAlert : internalSelectedAlert;
+  const setSelectedAlert = (alert: EmergencyAlert | null) => {
+    if (onSelectAlert) onSelectAlert(alert);
+    setInternalSelectedAlert(alert);
+  };
   const [isCreatingAlert, setIsCreatingAlert] = useState<boolean>(false);
 
   // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
@@ -456,6 +465,15 @@ export const MapView: React.FC<MapViewProps> = ({
       });
     }
   }, [selectedDitch]);
+
+  // 선택된 긴급상황 경광등 카메라 포커싱
+  useEffect(() => {
+    if (selectedAlert && mapRef.current) {
+      mapRef.current.flyTo([selectedAlert.latitude, selectedAlert.longitude], 18, {
+        duration: 0.8,
+      });
+    }
+  }, [selectedAlert]);
 
   // 내 위치로 지도 이동
   const handlePanToCurrentLocation = () => {

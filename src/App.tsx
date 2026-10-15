@@ -59,8 +59,9 @@ export const App: React.FC = () => {
   // 3. 네비게이션 뷰: 'map' | 'dashboard'
   const [currentView, setCurrentView] = useState<'map' | 'dashboard'>('map');
 
-  // 4. 지도 선택 배수로
+  // 4. 지도 선택 배수로 및 긴급상황 경광등
   const [selectedDitch, setSelectedDitch] = useState<DitchMaster | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
 
   // 5. 모달 및 플로우 상태
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
@@ -249,7 +250,9 @@ export const App: React.FC = () => {
   const handleDeleteDitch = async (ditchId: string) => {
     await deleteDitch(ditchId);
     await loadData();
-    setSelectedDitch(null);
+    if (selectedDitch?.id === ditchId) {
+      setSelectedDitch(null);
+    }
   };
 
   // 촬영 시작 버튼 클릭 -> 고스트 카메라 열기
@@ -341,11 +344,22 @@ export const App: React.FC = () => {
   const handleDeleteAlert = async (alertId: string) => {
     await deleteAlert(alertId);
     await loadData();
+    if (selectedAlert?.id === alertId) {
+      setSelectedAlert(null);
+    }
   };
 
   // 대시보드에서 배수로 지도 이동
   const handleSelectDitchOnMap = (ditch: DitchMaster) => {
+    setSelectedAlert(null);
     setSelectedDitch(ditch);
+    setCurrentView('map');
+  };
+
+  // 대시보드에서 긴급상황 경광등 지도 이동
+  const handleSelectAlertOnMap = (alert: EmergencyAlert) => {
+    setSelectedDitch(null);
+    setSelectedAlert(alert);
     setCurrentView('map');
   };
 
@@ -368,6 +382,7 @@ export const App: React.FC = () => {
           onClick={() => {
             setCurrentView('map');
             setSelectedDitch(null);
+            setSelectedAlert(null);
             setIsQuickFormOpen(false);
             setIsHistoryOpen(false);
             setIsCameraOpen(false);
@@ -474,7 +489,10 @@ export const App: React.FC = () => {
             ditches={ditches}
             userRole={userRole}
             selectedDitch={selectedDitch}
-            onSelectDitch={setSelectedDitch}
+            onSelectDitch={(ditch) => {
+              setSelectedDitch(ditch);
+              if (ditch) setSelectedAlert(null);
+            }}
             onStartInspection={handleStartInspection}
             onOpenInspectionForm={handleOpenInspectionForm}
             onViewHistory={(ditch) => {
@@ -496,13 +514,30 @@ export const App: React.FC = () => {
             alerts={alerts}
             onCreateAlert={handleCreateAlert}
             onDeleteAlert={handleDeleteAlert}
+            selectedAlert={selectedAlert}
+            onSelectAlert={(alert) => {
+              setSelectedAlert(alert);
+              if (alert) setSelectedDitch(null);
+            }}
           />
         ) : (
           <AdminDashboard
             ditches={ditches}
             inspections={inspections}
+            alerts={alerts}
             onRefreshData={loadData}
             onSelectDitchOnMap={handleSelectDitchOnMap}
+            onSelectAlertOnMap={handleSelectAlertOnMap}
+            onOpenHistory={(ditch) => {
+              setSelectedDitch(ditch);
+              setIsHistoryOpen(true);
+            }}
+            onOpenEdit={(ditch) => {
+              setEditingDitch(ditch);
+              setIsDitchEditOpen(true);
+            }}
+            onDeleteDitch={handleDeleteDitch}
+            onDeleteAlert={handleDeleteAlert}
           />
         )}
       </main>
