@@ -103,9 +103,12 @@ export async function deleteDitch(ditchId: string): Promise<void> {
 export async function getInspections(ditchId?: string): Promise<InspectionRecord[]> {
   try {
     let data = await get<InspectionRecord[]>(INSPECTIONS_KEY);
-    if (!data || data.length === 0) {
-      await set(INSPECTIONS_KEY, INITIAL_INSPECTIONS);
-      data = INITIAL_INSPECTIONS;
+    // 최초 실행 시에만 초기 데이터 확인 (이미 빈 배열[]로 초기화된 경우는 리셋하지 않음)
+    if (data === undefined || data === null) {
+      const ditches = await get<DitchMaster[]>(DITCHES_KEY);
+      const isDefaultDitches = ditches && ditches.some((d) => d.id === 'ditch-001');
+      data = isDefaultDitches ? INITIAL_INSPECTIONS : [];
+      await set(INSPECTIONS_KEY, data);
     }
     if (ditchId) {
       return data.filter((insp) => insp.ditchId === ditchId);
@@ -113,7 +116,7 @@ export async function getInspections(ditchId?: string): Promise<InspectionRecord
     return data;
   } catch (error) {
     console.error('Failed to load inspections from IndexedDB:', error);
-    return INITIAL_INSPECTIONS;
+    return [];
   }
 }
 
@@ -153,7 +156,7 @@ export async function saveInspection(record: InspectionRecord): Promise<void> {
   }
 }
 
-// 5-1. 점검 기록(사진 포함) 삭제 및 배수로 상태 최신화
+// 5-1. 점검 기록 1건(사진 포함) 영구 삭제 및 배수로 상태 최신화
 export async function deleteInspection(inspectionId: string): Promise<void> {
   const inspections = await getInspections();
   const target = inspections.find((i) => i.id === inspectionId);
@@ -161,7 +164,11 @@ export async function deleteInspection(inspectionId: string): Promise<void> {
   await set(INSPECTIONS_KEY, remaining);
 
   // 파이어베이스 클라우드에서도 영구 삭제
-  deleteInspectionFromCloud(inspectionId).catch(() => {});
+  try {
+    await deleteInspectionFromCloud(inspectionId);
+  } catch (err) {
+    console.warn('Failed to delete inspection from cloud:', err);
+  }
 
   // 배수로 마스터의 lastInspectedAt 및 currentStatus 상태 롤백/갱신
   if (target) {
@@ -194,6 +201,23 @@ export async function deleteInspection(inspectionId: string): Promise<void> {
       }
       await saveDitch(ditch);
     }
+  }
+}
+
+// 5-2. 점검 기록의 사진만 선택 삭제 (점검 내역 및 판정 상태는 안전하게 유지)
+export async function deleteInspectionPhoto(inspectionId: string): Promise<void> {
+  const inspections = await getInspections();
+  const target = inspections.find((i) => i.id === inspectionId);
+  if (!target) return;
+
+  target.photoCurrentUrl = '';
+  await set(INSPECTIONS_KEY, inspections);
+
+  // 파이어베이스 클라우드에도 사진 제거 상태 즉시 동기화
+  try {
+    await syncInspectionToCloud(target);
+  } catch (err) {
+    console.warn('Failed to sync photo deletion to cloud:', err);
   }
 }
 

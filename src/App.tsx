@@ -17,6 +17,7 @@ import {
   deleteDitch,
   saveInspection,
   deleteInspection,
+  deleteInspectionPhoto,
   getUserSession,
   saveUserSession,
   setDitchesCache,
@@ -280,10 +281,23 @@ export const App: React.FC = () => {
     setCapturedPhotoUrl('');
   };
 
-  // 점검 기록 및 사진 삭제 완료
+  // 점검 기록 1건(사진 포함) 영구 삭제 완료
   const handleDeleteInspection = async (inspectionId: string) => {
     await deleteInspection(inspectionId);
     await deleteInspectionFromCloud(inspectionId);
+    await loadData();
+    if (selectedDitch) {
+      const updatedDitches = await getDitches();
+      const updatedTarget = updatedDitches.find((d) => d.id === selectedDitch.id);
+      if (updatedTarget) {
+        setSelectedDitch(updatedTarget);
+      }
+    }
+  };
+
+  // 점검 기록의 사진만 선택 삭제 (기록은 유지)
+  const handleDeleteInspectionPhoto = async (inspectionId: string) => {
+    await deleteInspectionPhoto(inspectionId);
     await loadData();
     if (selectedDitch) {
       const updatedDitches = await getDitches();
@@ -497,6 +511,7 @@ export const App: React.FC = () => {
           inspections={inspections.filter((insp) => insp.ditchId === selectedDitch.id)}
           onClose={() => setIsHistoryOpen(false)}
           onDeleteInspection={handleDeleteInspection}
+          onDeletePhoto={handleDeleteInspectionPhoto}
         />
       )}
 

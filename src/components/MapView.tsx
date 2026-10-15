@@ -60,11 +60,11 @@ export const MapView: React.FC<MapViewProps> = ({
   // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('streets');
 
-  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (동·서·남·북 4방향 모두 반경 500m)
+  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (동·서·남·북 4방향 모두 반경 400m)
   const FACILITY_CENTER: [number, number] = [37.357515, 127.112388];
   const FACILITY_BOUNDS = L.latLngBounds(
-    [37.3530, 127.1067], // 남서쪽 (SW: 남 500m, 서 500m)
-    [37.3620, 127.1181]  // 북동쪽 (NE: 북 500m, 동 500m)
+    [37.3539, 127.1079], // 남서쪽 (SW: 남 400m, 서 400m)
+    [37.3611, 127.1169]  // 북동쪽 (NE: 북 400m, 동 400m)
   );
 
   // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
@@ -211,7 +211,7 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
       zoom: 18,
-      minZoom: 16, // 최소 축소 제한 (복지관 부지 반경 500m 조망)
+      minZoom: 16, // 최소 축소 제한 (복지관 부지 반경 400m 조망)
       maxZoom: 20, // 최대 확대 제한 (20레벨까지 확대 지원)
       maxBounds: FACILITY_BOUNDS, // 부지 밖 이동 차단 (투명 울타리)
       maxBoundsViscosity: 1.0, // 경계에 도달 시 단단하게 튕겨나옴

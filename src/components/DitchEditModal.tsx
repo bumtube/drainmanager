@@ -123,7 +123,11 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
 
   const handleDelete = async () => {
     if (!ditch || !onDelete) return;
-    if (confirm(`'${ditch.name}' 배수로를 삭제하시겠습니까? 관련된 점검 이력도 함께 삭제됩니다.`)) {
+    if (
+      confirm(
+        `⚠️ [주의: 배수로 시설물 핀 삭제]\n\n'${ditch.name}' 배수로 시설물 핀 자체를 지도에서 완전히 삭제하시겠습니까?\n\n※ 배수로 핀이 지도에서 완전히 제거되며, 관련 점검 이력도 모두 함께 삭제됩니다.\n\n특정 점검 사진이나 1건의 점검 기록만 삭제하시려면 [취소]를 누르신 후 [과거 점검 이력] 창에서 삭제해주세요.`
+      )
+    ) {
       try {
         await onDelete(ditch.id);
         onClose();
@@ -305,9 +309,10 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="h-12 px-4 rounded-xl border border-rose-600/50 text-rose-400 hover:bg-rose-950 font-bold text-xs flex items-center gap-1 active:scale-95"
+                className="h-12 px-3 rounded-xl border border-rose-600/50 text-rose-400 hover:bg-rose-950 font-bold text-xs flex items-center gap-1 active:scale-95"
+                title="배수로 시설물 핀 자체를 지도에서 영구 삭제"
               >
-                <Trash2 className="w-4 h-4" /> 삭제
+                <Trash2 className="w-4 h-4" /> 배수로 핀 삭제
               </button>
             ) : (
               <button
