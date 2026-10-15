@@ -9,7 +9,7 @@ import {
   Sparkles,
   Info,
 } from 'lucide-react';
-import { DitchMaster, InspectionRecord, UserSession } from './types';
+import { DitchMaster, InspectionRecord, UserSession, EmergencyAlert } from './types';
 import {
   getDitches,
   getInspections,
@@ -22,6 +22,10 @@ import {
   saveUserSession,
   setDitchesCache,
   setInspectionsCache,
+  getAlerts,
+  saveAlert,
+  deleteAlert,
+  setAlertsCache,
 } from './services/storage';
 import {
   initFirebase,
@@ -48,6 +52,7 @@ export const App: React.FC = () => {
   // 2. 데이터 상태
   const [ditches, setDitches] = useState<DitchMaster[]>([]);
   const [inspections, setInspections] = useState<InspectionRecord[]>([]);
+  const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
@@ -81,8 +86,10 @@ export const App: React.FC = () => {
     try {
       const ditchList = await getDitches();
       const inspectionList = await getInspections();
+      const alertList = await getAlerts();
       setDitches(ditchList);
       setInspections(inspectionList);
+      setAlerts(alertList);
     } catch (err) {
       console.error('Data load error:', err);
     } finally {
@@ -127,6 +134,10 @@ export const App: React.FC = () => {
       },
       (connected) => {
         setIsCloudConnected(connected);
+      },
+      (cloudAlerts) => {
+        setAlerts(cloudAlerts);
+        setAlertsCache(cloudAlerts).catch(() => {});
       }
     );
 
@@ -308,6 +319,30 @@ export const App: React.FC = () => {
     }
   };
 
+  // 긴급상황 경광등 핀 생성
+  const handleCreateAlert = async (lat: number, lng: number, message?: string) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formatted = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const newAlert: EmergencyAlert = {
+      id: 'alert-' + Date.now(),
+      latitude: lat,
+      longitude: lng,
+      createdAt: now.toISOString(),
+      createdFormatted: formatted,
+      creatorName: session?.name || '현장 점검자',
+      message: message || '🚨 현장 긴급상황 발생',
+    };
+    await saveAlert(newAlert);
+    await loadData();
+  };
+
+  // 긴급상황 경광등 핀 해제 (삭제)
+  const handleDeleteAlert = async (alertId: string) => {
+    await deleteAlert(alertId);
+    await loadData();
+  };
+
   // 대시보드에서 배수로 지도 이동
   const handleSelectDitchOnMap = (ditch: DitchMaster) => {
     setSelectedDitch(ditch);
@@ -458,6 +493,9 @@ export const App: React.FC = () => {
             currentGps={currentGps}
             gpsErrorMsg={gpsErrorMsg}
             onRetryGps={refreshGpsLocation}
+            alerts={alerts}
+            onCreateAlert={handleCreateAlert}
+            onDeleteAlert={handleDeleteAlert}
           />
         ) : (
           <AdminDashboard

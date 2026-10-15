@@ -10,7 +10,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { DitchMaster, InspectionRecord } from '../types';
+import { DitchMaster, InspectionRecord, EmergencyAlert } from '../types';
 import { compressBase64Image } from './imageOptimizer';
 
 // 사용자의 실제 Firebase 프로젝트 설정
@@ -97,6 +97,38 @@ export async function deleteInspectionFromCloud(inspectionId: string): Promise<b
   }
 }
 
+// 2-2. 클라우드 Firestore에 긴급상황 경광등 핀 저장
+export async function syncAlertToCloud(alert: EmergencyAlert): Promise<boolean> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return false;
+
+    const ref = doc(dbInstance, 'alerts', alert.id);
+    await setDoc(ref, alert, { merge: true });
+    console.log('🚨 긴급상황 경광등 핀 클라우드 동기화 완료:', alert.id);
+    return true;
+  } catch (err) {
+    console.warn('❌ 긴급상황 경광등 핀 클라우드 저장 실패:', err);
+    return false;
+  }
+}
+
+// 2-3. 클라우드 Firestore에서 긴급상황 경광등 핀 삭제(해제)
+export async function deleteAlertFromCloud(alertId: string): Promise<boolean> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return false;
+
+    const ref = doc(dbInstance, 'alerts', alertId);
+    await deleteDoc(ref);
+    console.log('✅ 긴급상황 경광등 핀 클라우드 해제(삭제) 완료:', alertId);
+    return true;
+  } catch (err) {
+    console.warn('❌ 긴급상황 경광등 핀 클라우드 삭제 실패:', err);
+    return false;
+  }
+}
+
 // 3. 클라우드 Firestore에 점검 기록 저장 (사진 압축 최적화 포함)
 export async function syncInspectionToCloud(record: InspectionRecord): Promise<boolean> {
   try {
@@ -167,11 +199,31 @@ export async function fetchInspectionsFromCloud(): Promise<InspectionRecord[]> {
   }
 }
 
-// 6. ★실시간 양방향 구독 (누군가 등록/점검/수정하면 다른 사람 화면에 1초 만에 자동 반영)
+// 5-2. 클라우드에서 긴급상황 핀 전체 목록 가져오기 (1회성)
+export async function fetchAlertsFromCloud(): Promise<EmergencyAlert[]> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return [];
+
+    const snapshot = await getDocs(collection(dbInstance, 'alerts'));
+    const list: EmergencyAlert[] = [];
+    snapshot.forEach((d) => {
+      list.push(d.data() as EmergencyAlert);
+    });
+    list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return list;
+  } catch (err) {
+    console.warn('클라우드 긴급상황 목록 불러오기 실패:', err);
+    return [];
+  }
+}
+
+// 6. ★실시간 양방향 구독 (배수로, 점검기록, 긴급상황 핀 실시간 동기화)
 export function subscribeToCloudUpdates(
   onDitchesUpdate: (ditches: DitchMaster[]) => void,
   onInspectionsUpdate: (inspections: InspectionRecord[]) => void,
-  onConnectionStatus?: (connected: boolean) => void
+  onConnectionStatus?: (connected: boolean) => void,
+  onAlertsUpdate?: (alerts: EmergencyAlert[]) => void
 ) {
   try {
     if (!dbInstance) initFirebase();
@@ -208,9 +260,25 @@ export function subscribeToCloudUpdates(
       (err) => console.warn('점검기록 실시간 리스너 에러:', err)
     );
 
+    // 긴급상황 경광등 핀 실시간 감지
+    let unsubAlerts = () => {};
+    if (onAlertsUpdate) {
+      unsubAlerts = onSnapshot(
+        collection(dbInstance, 'alerts'),
+        (snapshot) => {
+          const list: EmergencyAlert[] = [];
+          snapshot.forEach((d) => list.push(d.data() as EmergencyAlert));
+          list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          onAlertsUpdate(list);
+        },
+        (err) => console.warn('긴급상황 핀 실시간 리스너 에러:', err)
+      );
+    }
+
     return () => {
       unsubDitches();
       unsubInspections();
+      unsubAlerts();
     };
   } catch (err) {
     console.warn('실시간 구독 등록 실패:', err);

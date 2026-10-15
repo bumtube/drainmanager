@@ -1,10 +1,18 @@
 import { get, set } from 'idb-keyval';
-import { DitchMaster, InspectionRecord, UserSession, FirebaseConfigState } from '../types';
+import { DitchMaster, InspectionRecord, UserSession, FirebaseConfigState, EmergencyAlert } from '../types';
 import { INITIAL_DITCHES, INITIAL_INSPECTIONS } from './seedData';
-import { syncDitchToCloud, syncInspectionToCloud, deleteDitchFromCloud, deleteInspectionFromCloud } from './firebase';
+import {
+  syncDitchToCloud,
+  syncInspectionToCloud,
+  deleteDitchFromCloud,
+  deleteInspectionFromCloud,
+  syncAlertToCloud,
+  deleteAlertFromCloud,
+} from './firebase';
 
 const DITCHES_KEY = 'dm_ditches_v2';
 const INSPECTIONS_KEY = 'dm_inspections_v2';
+const ALERTS_KEY = 'dm_alerts_v1';
 const USER_SESSION_KEY = 'dm_user_session';
 const FIREBASE_CONFIG_KEY = 'dm_firebase_config';
 
@@ -218,6 +226,54 @@ export async function deleteInspectionPhoto(inspectionId: string): Promise<void>
     await syncInspectionToCloud(target);
   } catch (err) {
     console.warn('Failed to sync photo deletion to cloud:', err);
+  }
+}
+
+// 5-3. 긴급상황 경광등 핀 목록 조회
+export async function getAlerts(): Promise<EmergencyAlert[]> {
+  try {
+    const data = await get<EmergencyAlert[]>(ALERTS_KEY);
+    return data || [];
+  } catch (error) {
+    console.error('Failed to load alerts from IndexedDB:', error);
+    return [];
+  }
+}
+
+// 5-4. 긴급상황 경광등 핀 저장
+export async function saveAlert(alert: EmergencyAlert): Promise<void> {
+  const alerts = await getAlerts();
+  alerts.unshift(alert);
+  await set(ALERTS_KEY, alerts);
+
+  // 클라우드 Firestore 실시간 동기화
+  try {
+    await syncAlertToCloud(alert);
+  } catch (err) {
+    console.warn('Failed to sync alert to cloud:', err);
+  }
+}
+
+// 5-5. 긴급상황 경광등 핀 해제 (삭제)
+export async function deleteAlert(alertId: string): Promise<void> {
+  const alerts = await getAlerts();
+  const remaining = alerts.filter((a) => a.id !== alertId);
+  await set(ALERTS_KEY, remaining);
+
+  // 클라우드 Firestore에서도 영구 삭제
+  try {
+    await deleteAlertFromCloud(alertId);
+  } catch (err) {
+    console.warn('Failed to delete alert from cloud:', err);
+  }
+}
+
+// 5-6. 클라우드에서 받은 최신 긴급상황 목록 캐시 저장
+export async function setAlertsCache(alerts: EmergencyAlert[]): Promise<void> {
+  try {
+    await set(ALERTS_KEY, alerts);
+  } catch (err) {
+    console.warn('Failed to update alerts cache:', err);
   }
 }
 

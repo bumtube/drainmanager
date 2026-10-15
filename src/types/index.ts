@@ -50,3 +50,14 @@ export interface FirebaseConfigState {
   appId?: string;
   enabled: boolean;
 }
+
+export interface EmergencyAlert {
+  id: string; // 고유 ID (예: alert-1792076000000)
+  latitude: number; // 발생 위도
+  longitude: number; // 발생 경도
+  createdAt: string; // ISO 타임스탬프
+  createdFormatted: string; // 표시용 일시 (예: 2026-10-16 00:05)
+  creatorName: string; // 등록자 이름 (예: 김철수 주사님)
+  message: string; // 상황 설명 (예: 긴급 지원 필요)
+}
+

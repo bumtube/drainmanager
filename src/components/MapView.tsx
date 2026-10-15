@@ -16,8 +16,10 @@ import {
   Camera,
   X,
   ExternalLink,
+  Siren,
+  Trash2,
 } from 'lucide-react';
-import { DitchMaster, DrainStatus, UserRole } from '../types';
+import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
 
 interface MapViewProps {
   ditches: DitchMaster[];
@@ -33,6 +35,9 @@ interface MapViewProps {
   currentGps: { latitude: number; longitude: number; accuracy?: number } | null;
   gpsErrorMsg?: string | null;
   onRetryGps?: () => void;
+  alerts?: EmergencyAlert[];
+  onCreateAlert?: (lat: number, lng: number, message?: string) => Promise<void> | void;
+  onDeleteAlert?: (alertId: string) => Promise<void> | void;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -49,19 +54,27 @@ export const MapView: React.FC<MapViewProps> = ({
   currentGps,
   gpsErrorMsg,
   onRetryGps,
+  alerts = [],
+  onCreateAlert,
+  onDeleteAlert,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const alertsLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userCircleRef = useRef<L.Circle | null>(null);
+
+  // 긴급상황 경광등 핀 선택 및 생성 로딩 상태
+  const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
+  const [isCreatingAlert, setIsCreatingAlert] = useState<boolean>(false);
 
   // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('streets');
 
-  // 분당노인종합복지관(불정로 50) 기준 가상 울타리 (동·서·남·북 4방향 모두 반경 400m)
-  const FACILITY_CENTER: [number, number] = [37.357515, 127.112388];
+  // 경기도 성남시 분당구 불정로 50 (분당노인종합복지관) 정확한 중심 좌표
+  const FACILITY_CENTER: [number, number] = [37.357602, 127.112510];
   const FACILITY_BOUNDS = L.latLngBounds(
     [37.3539, 127.1079], // 남서쪽 (SW: 남 400m, 서 400m)
     [37.3611, 127.1169]  // 북동쪽 (NE: 북 400m, 동 400m)
@@ -235,9 +248,14 @@ export const MapView: React.FC<MapViewProps> = ({
     const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
 
+    // 긴급상황 경광등 핀 레이어 그룹 생성
+    const alertsLayer = L.layerGroup().addTo(map);
+    alertsLayerRef.current = alertsLayer;
+
     // 맵 클릭 시 바텀시트 닫기
     map.on('click', () => {
       onSelectDitch(null);
+      setSelectedAlert(null);
     });
 
     mapRef.current = map;
@@ -320,6 +338,73 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [ditches, selectedDitch, userRole, selectedSection]);
 
+  // 3-1. 긴급상황 경광등 마커 아이콘 생성 (붉은색 플래시 핑 + 입체 경광등 뱃지)
+  const createEmergencyAlertMarkerIcon = (alert: EmergencyAlert, isSelected: boolean) => {
+    const html = `
+      <div class="relative flex items-center justify-center cursor-pointer">
+        <!-- 붉은색 외곽 레이더 핑 애니메이션 (경광등 플래시 효과) -->
+        <span class="absolute -inset-4 rounded-full bg-rose-500/50 animate-ping pointer-events-none"></span>
+        <span class="absolute -inset-2 rounded-full bg-rose-600/70 animate-pulse pointer-events-none"></span>
+
+        <!-- 경광등 본체 (빨간 원형 뱃지 + 흰색 테두리 + 그림자) -->
+        <div class="relative w-11 h-11 bg-rose-600 border-2 border-white rounded-full shadow-2xl flex items-center justify-center text-white z-20 ${
+          isSelected ? 'ring-4 ring-yellow-400 scale-110' : 'scale-100 hover:scale-105'
+        } transition-all">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 12a5 5 0 0 1 5-5v0a5 5 0 0 1 5 5v6H7v-6z"/>
+            <path d="M5 20a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5v-2z"/>
+            <path d="M21 12h1"/>
+            <path d="M18.5 4.5 19 4"/>
+            <path d="M2 12h1"/>
+            <path d="M12 2v1"/>
+            <path d="M4.5 4.5 5 4"/>
+          </svg>
+        </div>
+
+        <!-- 상단 말풍선 라벨 -->
+        <div class="absolute -top-7 px-2 py-0.5 bg-rose-950/95 border border-rose-500 text-rose-200 text-[10px] font-black rounded-md whitespace-nowrap shadow-lg flex items-center gap-1 z-30">
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping"></span>
+          🚨 긴급상황
+        </div>
+      </div>
+    `;
+
+    return L.divIcon({
+      html,
+      className: 'emergency-alert-pin',
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+    });
+  };
+
+  // 3-2. 긴급상황 경광등 핀 렌더링
+  useEffect(() => {
+    if (!mapRef.current || !alertsLayerRef.current) return;
+
+    alertsLayerRef.current.clearLayers();
+
+    (alerts || []).forEach((alert) => {
+      const isSelected = selectedAlert?.id === alert.id;
+      const marker = L.marker([alert.latitude, alert.longitude], {
+        icon: createEmergencyAlertMarkerIcon(alert, isSelected),
+        zIndexOffset: 2000, // 배수로 핀보다 항상 위에 보이도록 최상단 z-index
+      });
+
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        onSelectDitch(null); // 배수로 선택 해제
+        setSelectedAlert(alert);
+      });
+
+      marker.bindTooltip(
+        `🚨 긴급상황: ${alert.message || '현장 긴급상황'} (${alert.createdFormatted})`,
+        { direction: 'top', offset: [0, -22] }
+      );
+
+      marker.addTo(alertsLayerRef.current!);
+    });
+  }, [alerts, selectedAlert]);
+
   const hasCenteredOnUserRef = useRef<boolean>(false);
   const [showGpsHelpModal, setShowGpsHelpModal] = useState<boolean>(false);
   const isKakaoTalk = typeof navigator !== 'undefined' && /KAKAOTALK/i.test(navigator.userAgent);
@@ -382,6 +467,56 @@ export const MapView: React.FC<MapViewProps> = ({
     mapRef.current.flyTo([currentGps.latitude, currentGps.longitude], 18, {
       duration: 1,
     });
+  };
+
+  // 불정로 50(복지관 본관 중심) 화면 센터로 이동
+  const handlePanToFacilityCenter = () => {
+    onSelectDitch(null); // 열려있는 배수로 선택 시트 닫기
+    setSelectedAlert(null);
+    if (mapRef.current) {
+      mapRef.current.flyTo(FACILITY_CENTER, 18, {
+        duration: 0.8,
+      });
+    }
+  };
+
+  // 긴급상황 경광등 핀 생성 트리거 (5번째 우측 버튼 클릭 시)
+  const handleTriggerEmergencyAlert = async () => {
+    // 위치 파악: 1순위 스마트폰 실제 GPS 위치, 2순위 지도 현재 중심 좌표
+    let targetLat = currentGps?.latitude;
+    let targetLng = currentGps?.longitude;
+    let locationMsg = '현재 스마트폰 GPS 위치';
+
+    if (!targetLat || !targetLng) {
+      const center = mapRef.current?.getCenter();
+      if (!center) {
+        alert('위치 정보를 확인할 수 없습니다. 스마트폰 GPS를 확인해주세요.');
+        return;
+      }
+      targetLat = center.lat;
+      targetLng = center.lng;
+      locationMsg = '현재 지도 중심 위치';
+    }
+
+    const confirmed = window.confirm(
+      `🚨 [긴급상황 위치 경광등 등록]\n\n${locationMsg}에 긴급상황 경광등 핀을 등록하시겠습니까?\n\n※ 등록 즉시 모든 사용자의 지도에 깜빡이는 빨간 경광등 핀이 실시간으로 표시됩니다.`
+    );
+
+    if (!confirmed) return;
+
+    setIsCreatingAlert(true);
+    try {
+      if (onCreateAlert) {
+        await onCreateAlert(targetLat, targetLng, '🚨 현장 긴급상황 발생');
+      }
+      // 지도 중심을 새로 생성된 경광등 핀으로 즉시 이동
+      mapRef.current?.flyTo([targetLat, targetLng], 19, { duration: 0.8 });
+    } catch (err) {
+      console.error('Failed to create emergency alert:', err);
+      alert('긴급상황 핀 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsCreatingAlert(false);
+    }
   };
 
   return (
@@ -499,11 +634,9 @@ export const MapView: React.FC<MapViewProps> = ({
         </button>
 
         <button
-          onClick={() => {
-            mapRef.current?.flyTo(FACILITY_CENTER, 18, { duration: 0.8 });
-          }}
+          onClick={handlePanToFacilityCenter}
           className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
-          title="복지관 부지 원위치로 복귀"
+          title="불정로 50 화면 센터로 이동"
         >
           <MapPin className="w-6 h-6 text-emerald-400" />
         </button>
@@ -520,6 +653,18 @@ export const MapView: React.FC<MapViewProps> = ({
         >
           -
         </button>
+
+        {/* 🚨 5번째 버튼: 긴급상황 경광등 핀 생성 버튼 */}
+        <button
+          type="button"
+          onClick={handleTriggerEmergencyAlert}
+          disabled={isCreatingAlert}
+          className="w-12 h-12 bg-rose-950/90 hover:bg-rose-900 text-rose-400 hover:text-white rounded-xl shadow-2xl shadow-rose-950/80 flex items-center justify-center border-2 border-rose-500 active:scale-95 transition-all relative group"
+          title="현재 위치에 긴급상황 경광등 핀 등록"
+        >
+          <Siren className="w-6 h-6 animate-pulse" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 animate-ping"></span>
+        </button>
       </div>
 
       {/* 4. [관리자 전용] 현장 배수로 핀 등록 플로팅 버튼 (FAB) */}
@@ -531,6 +676,87 @@ export const MapView: React.FC<MapViewProps> = ({
           <Plus className="w-5 h-5" />
           현장 배수로 등록
         </button>
+      )}
+
+      {/* 🚨 긴급상황 경광등 핀 상세 및 해제 시트 */}
+      {selectedAlert && (
+        <div className="absolute bottom-0 inset-x-0 z-30 p-3 sm:p-4 max-w-lg mx-auto">
+          <div className="bg-slate-900/95 backdrop-blur-md border-2 border-rose-500/80 rounded-2xl p-4 shadow-2xl text-white space-y-3 animate-in slide-in-from-bottom duration-200">
+            {/* 상단 닫기 & 뱃지 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                </span>
+                <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  🚨 긴급상황 경광등 핀
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAlert(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 내용 정보 */}
+            <div>
+              <h3 className="text-lg font-black text-rose-400 flex items-center gap-2">
+                <Siren className="w-5 h-5 shrink-0" />
+                <span>{selectedAlert.message || '현장 긴급상황 발생'}</span>
+              </h3>
+              <div className="text-xs text-slate-300 mt-2 space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">신고자(등록자):</span>
+                  <span className="text-white font-bold">{selectedAlert.creatorName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">등록 일시:</span>
+                  <span className="text-slate-200 font-semibold">{selectedAlert.createdFormatted}</span>
+                </div>
+                <div className="flex justify-between font-mono text-[11px]">
+                  <span className="text-slate-400 font-sans">발생 좌표:</span>
+                  <span className="text-slate-300">
+                    {selectedAlert.latitude.toFixed(6)}, {selectedAlert.longitude.toFixed(6)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 하단 버튼 (닫기 & 해제/삭제) */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setSelectedAlert(null)}
+                className="flex-1 h-12 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs active:scale-95 transition-all"
+              >
+                닫기
+              </button>
+              {onDeleteAlert && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (
+                      window.confirm(
+                        '이 긴급상황 경광등 핀을 지도에서 해제(삭제)하시겠습니까?\n\n(상황 종료 시 모든 사용자의 화면에서 즉시 제거됩니다.)'
+                      )
+                    ) {
+                      await onDeleteAlert(selectedAlert.id);
+                      setSelectedAlert(null);
+                    }
+                  }}
+                  className="flex-1 h-12 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-rose-950/50 active:scale-95 transition-all"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  경광등 핀 해제 (삭제)
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 5. 배수로 선택 바텀시트 (Bottom Sheet) */}
