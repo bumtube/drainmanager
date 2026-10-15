@@ -85,18 +85,25 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     rawWidth: number,
     rawHeight: number
   ): string => {
-    // 가로 최대 960px로 최적화 리사이징 (선명도는 유지하고 용량을 150KB로 압축)
-    const MAX_WIDTH = 960;
+    // 가로/세로 중 긴 쪽을 960px 이하로 최적화 리사이징 (선명도는 유지하고 용량을 80~120KB로 압축)
+    const MAX_DIM = 960;
     let width = rawWidth;
     let height = rawHeight;
-    if (width > MAX_WIDTH) {
-      height = Math.round((height * MAX_WIDTH) / width);
-      width = MAX_WIDTH;
+    if (width > height) {
+      if (width > MAX_DIM) {
+        height = Math.round((height * MAX_DIM) / width);
+        width = MAX_DIM;
+      }
+    } else {
+      if (height > MAX_DIM) {
+        width = Math.round((width * MAX_DIM) / height);
+        height = MAX_DIM;
+      }
     }
 
     const canvas = canvasRef.current || document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.max(width, 1);
+    canvas.height = Math.max(height, 1);
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
@@ -115,12 +122,14 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     const lng = currentGps?.longitude ? currentGps.longitude.toFixed(6) : ditch.longitude.toFixed(6);
     const acc = currentGps?.accuracy ? ` (오차: ${currentGps.accuracy.toFixed(1)}m)` : '';
 
-    const line1 = `[배수로 현장점검] ${ditch.code} | ${ditch.name}`;
+    const safeCode = ditch.code.replace(/주차장/g, '도로');
+    const safeName = ditch.name.replace(/주차장/g, '도로');
+    const line1 = `[배수로 현장점검] ${safeCode} | ${safeName}`;
     const line2 = `일시: ${formattedDate} | 점검자: ${inspectorName}`;
     const line3 = `위치: N ${lat}, E ${lng}${acc}`;
 
     // 3. 고대비 워터마크 박스 (하단 배경 반투명 블랙)
-    const boxHeight = Math.max(80, Math.floor(height * 0.14));
+    const boxHeight = Math.max(75, Math.floor(height * 0.14));
     ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
     ctx.fillRect(0, height - boxHeight, width, boxHeight);
 
@@ -129,14 +138,14 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     ctx.fillRect(0, height - boxHeight, width, 4);
 
     // 4. 텍스트 각인
-    const fontSize = Math.max(15, Math.floor(width * 0.024));
+    const fontSize = Math.max(14, Math.floor(width * 0.024));
     ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${fontSize}px "Pretendard", -apple-system, sans-serif`;
     ctx.textBaseline = 'middle';
 
-    const paddingX = 20;
-    const startY = height - boxHeight + 20;
-    const lineHeight = (boxHeight - 30) / 2;
+    const paddingX = 16;
+    const startY = height - boxHeight + 18;
+    const lineHeight = (boxHeight - 28) / 2;
 
     ctx.fillText(line1, paddingX, startY);
     ctx.fillStyle = '#cbd5e1';
@@ -145,8 +154,8 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     ctx.fillStyle = '#38bdf8';
     ctx.fillText(line3, paddingX, startY + lineHeight * 2);
 
-    // JPEG 0.72 압축: 화질은 선명하게 유지되며 파일 용량은 약 100~150KB로 최적화됨 (Firestore 1MB 한도 통과)
-    return canvas.toDataURL('image/jpeg', 0.72);
+    // JPEG 0.68 압축: 화질과 워터마크는 매우 선명하게 유지되며 파일 용량은 약 80~120KB로 압축 (Firestore 1MB 한도 여유롭게 통과)
+    return canvas.toDataURL('image/jpeg', 0.68);
   };
 
   // 셔터 캡처

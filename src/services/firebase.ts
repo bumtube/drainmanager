@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { DitchMaster, InspectionRecord } from '../types';
+import { compressBase64Image } from './imageOptimizer';
 
 // 사용자의 실제 Firebase 프로젝트 설정
 export const DEFAULT_FIREBASE_CONFIG = {
@@ -80,15 +81,33 @@ export async function deleteDitchFromCloud(ditchId: string): Promise<boolean> {
   }
 }
 
-// 3. 클라우드 Firestore에 점검 기록 저장
+// 3. 클라우드 Firestore에 점검 기록 저장 (사진 압축 최적화 포함)
 export async function syncInspectionToCloud(record: InspectionRecord): Promise<boolean> {
   try {
     if (!dbInstance) initFirebase();
     if (!dbInstance) return false;
 
+    // 금회 사진 최적화: Firestore 1MB 제한을 안전하게 통과하도록 압축 (80~120KB)
+    let optimizedCurrent = record.photoCurrentUrl;
+    if (optimizedCurrent && optimizedCurrent.startsWith('data:image')) {
+      optimizedCurrent = await compressBase64Image(optimizedCurrent, 960, 0.65);
+    }
+
+    // 직전 사진은 용량 절약을 위해 640px 이하로 압축 (단일 문서 300KB 이내 보장)
+    let optimizedPrevious = record.photoPreviousUrl;
+    if (optimizedPrevious && optimizedPrevious.startsWith('data:image')) {
+      optimizedPrevious = await compressBase64Image(optimizedPrevious, 640, 0.55);
+    }
+
+    const payload: InspectionRecord = {
+      ...record,
+      photoCurrentUrl: optimizedCurrent,
+      photoPreviousUrl: optimizedPrevious,
+    };
+
     const ref = doc(dbInstance, 'inspections', record.id);
-    await setDoc(ref, record, { merge: true });
-    console.log('✅ 점검기록 클라우드 동기화 완료:', record.id);
+    await setDoc(ref, payload, { merge: true });
+    console.log('✅ 점검기록(사진 포함) 클라우드 동기화 완료:', record.id);
     return true;
   } catch (err) {
     console.warn('❌ 점검기록 클라우드 동기화 실패:', err);

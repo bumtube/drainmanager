@@ -26,6 +26,7 @@ import {
   subscribeToCloudUpdates,
   syncDitchToCloud,
   syncInspectionToCloud,
+  fetchInspectionsFromCloud,
 } from './services/firebase';
 import { MapView } from './components/MapView';
 import { GhostCamera } from './components/GhostCamera';
@@ -90,7 +91,27 @@ export const App: React.FC = () => {
     loadData();
     initFirebase();
 
-    // 실시간 클라우드 동기화: 다른 사람이 점검/등록하면 내 화면에도 실시간 자동 반영
+    // 1. 기기 로컬에만 있고 클라우드에 아직 안 올라간 점검 기록(사진 포함)이 있으면 자동 업로드
+    (async () => {
+      try {
+        const localInspections = await getInspections();
+        if (localInspections.length > 0) {
+          const cloudInspections = await fetchInspectionsFromCloud();
+          const cloudIds = new Set(cloudInspections.map((i) => i.id));
+          for (const insp of localInspections) {
+            // 데모용 샘플(insp-001 등)이 아닌 실제 현장 점검 기록이고 클라우드에 없는 경우 자동 업로드
+            if (!cloudIds.has(insp.id)) {
+              console.log('🔄 미동기화된 현장 점검기록 클라우드 자동 업로드 중:', insp.id);
+              await syncInspectionToCloud(insp);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Pending inspection auto-sync error:', e);
+      }
+    })();
+
+    // 2. 실시간 클라우드 동기화: 다른 사람이 점검/등록하면 내 화면에도 실시간 자동 반영
     const unsubscribe = subscribeToCloudUpdates(
       (cloudDitches) => {
         setDitches(cloudDitches);
