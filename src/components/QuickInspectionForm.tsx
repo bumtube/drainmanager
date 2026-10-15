@@ -29,6 +29,7 @@ interface QuickInspectionFormProps {
   gpsAccuracy?: number;
   onSave: (record: InspectionRecord) => Promise<void>;
   onRetakePhoto: () => void;
+  onRemovePhoto?: () => void;
   onCancel: () => void;
 }
 
@@ -40,6 +41,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
   gpsAccuracy,
   onSave,
   onRetakePhoto,
+  onRemovePhoto,
   onCancel,
 }) => {
   // 폼 상태
@@ -184,13 +186,24 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
             <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
               <Camera className="w-4 h-4 text-emerald-400" /> 촬영 사진 및 직전 비교
             </span>
-            <button
-              type="button"
-              onClick={onRetakePhoto}
-              className="text-xs text-slate-400 hover:text-emerald-400 underline font-medium"
-            >
-              다시 촬영
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onRetakePhoto}
+                className="text-xs text-slate-400 hover:text-emerald-400 underline font-medium"
+              >
+                다시 촬영
+              </button>
+              {capturedPhotoUrl && onRemovePhoto && (
+                <button
+                  type="button"
+                  onClick={onRemovePhoto}
+                  className="text-xs text-rose-400 hover:text-rose-300 underline font-medium"
+                >
+                  사진 삭제
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -224,6 +237,16 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
                   <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                     금회 촬영 (NEW)
                   </span>
+                  {onRemovePhoto && (
+                    <button
+                      type="button"
+                      onClick={onRemovePhoto}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-rose-600 text-white rounded-full flex items-center justify-center transition-colors active:scale-95 shadow"
+                      title="촬영된 사진 삭제"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </>
               ) : (
                 <button

@@ -1,7 +1,7 @@
 import { get, set } from 'idb-keyval';
 import { DitchMaster, InspectionRecord, UserSession, FirebaseConfigState } from '../types';
 import { INITIAL_DITCHES, INITIAL_INSPECTIONS } from './seedData';
-import { syncDitchToCloud, syncInspectionToCloud, deleteDitchFromCloud } from './firebase';
+import { syncDitchToCloud, syncInspectionToCloud, deleteDitchFromCloud, deleteInspectionFromCloud } from './firebase';
 
 const DITCHES_KEY = 'dm_ditches_v2';
 const INSPECTIONS_KEY = 'dm_inspections_v2';
@@ -150,6 +150,50 @@ export async function saveInspection(record: InspectionRecord): Promise<void> {
       ditch.currentStatus = 'GOOD';
     }
     await saveDitch(ditch);
+  }
+}
+
+// 5-1. 점검 기록(사진 포함) 삭제 및 배수로 상태 최신화
+export async function deleteInspection(inspectionId: string): Promise<void> {
+  const inspections = await getInspections();
+  const target = inspections.find((i) => i.id === inspectionId);
+  const remaining = inspections.filter((i) => i.id !== inspectionId);
+  await set(INSPECTIONS_KEY, remaining);
+
+  // 파이어베이스 클라우드에서도 영구 삭제
+  deleteInspectionFromCloud(inspectionId).catch(() => {});
+
+  // 배수로 마스터의 lastInspectedAt 및 currentStatus 상태 롤백/갱신
+  if (target) {
+    const ditches = await getDitches();
+    const ditch = ditches.find((d) => d.id === target.ditchId);
+    if (ditch) {
+      const ditchInspections = remaining.filter((i) => i.ditchId === target.ditchId);
+      const latest = ditchInspections[0]; // remaining 목록의 최신 항목
+      if (latest) {
+        ditch.lastInspectedAt = latest.inspectedAt;
+        if (
+          latest.urgencyLevel === '긴급조치' ||
+          latest.sedimentStatus === '완전막힘' ||
+          latest.structureStatus === '파손/붕괴'
+        ) {
+          ditch.currentStatus = 'DANGER';
+        } else if (
+          latest.sedimentStatus === '준설필요' ||
+          latest.sedimentStatus === '준설필요(>30%)' ||
+          latest.urgencyLevel === '조치예정' ||
+          latest.structureStatus === '균열/이탈'
+        ) {
+          ditch.currentStatus = 'WARNING';
+        } else {
+          ditch.currentStatus = 'GOOD';
+        }
+      } else {
+        ditch.lastInspectedAt = '';
+        ditch.currentStatus = 'GOOD';
+      }
+      await saveDitch(ditch);
+    }
   }
 }
 

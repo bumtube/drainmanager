@@ -1,19 +1,39 @@
 import React, { useState } from 'react';
-import { X, Calendar, User, Eye, ShieldAlert, CheckCircle2, ChevronRight, Image } from 'lucide-react';
+import { X, Calendar, User, Eye, ShieldAlert, CheckCircle2, ChevronRight, Image, Trash2 } from 'lucide-react';
 import { DitchMaster, InspectionRecord } from '../types';
 
 interface InspectionHistoryModalProps {
   ditch: DitchMaster;
   inspections: InspectionRecord[];
   onClose: () => void;
+  onDeleteInspection?: (inspectionId: string) => Promise<void> | void;
 }
 
 export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
   ditch,
   inspections,
   onClose,
+  onDeleteInspection,
 }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (inspectionId: string) => {
+    if (!window.confirm('이 점검 기록과 사진을 정말 삭제하시겠습니까?\n(클라우드와 기기에서 모두 영구 삭제됩니다.)')) {
+      return;
+    }
+    setDeletingId(inspectionId);
+    try {
+      if (onDeleteInspection) {
+        await onDeleteInspection(inspectionId);
+      }
+    } catch (err) {
+      console.error('Failed to delete inspection:', err);
+      alert('점검 기록 삭제 중 문제가 발생했습니다.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
@@ -25,7 +45,7 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
               INSPECTION HISTORY
             </span>
             <h3 className="font-black text-white text-base sm:text-lg truncate max-w-xs sm:max-w-md">
-              {ditch.name} 이력
+              {ditch.name.replace(/주차장/g, '도로')} 이력
             </h3>
           </div>
           <button
@@ -50,7 +70,7 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
                 key={item.id}
                 className="bg-slate-800/80 border border-slate-700 rounded-xl p-4 space-y-3 hover:border-slate-600 transition-colors shadow-sm"
               >
-                {/* 상단 라인: 일시, 점검자, 조치구분 */}
+                {/* 상단 라인: 일시, 점검자, 조치구분, 삭제버튼 */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black px-2 py-0.5 rounded bg-slate-700 text-slate-200">
@@ -61,15 +81,30 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
                       {item.inspectedAt}
                     </span>
                   </div>
-                  <span
-                    className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
-                      item.urgencyLevel === '긴급조치'
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                    }`}
-                  >
-                    {item.urgencyLevel}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                        item.urgencyLevel === '긴급조치'
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                          : item.urgencyLevel === '조치예정'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      }`}
+                    >
+                      {item.urgencyLevel}
+                    </span>
+                    {onDeleteInspection && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deletingId === item.id}
+                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors active:scale-95"
+                        title="이 점검 기록 및 사진 영구 삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* 상태 뱃지 요약 */}

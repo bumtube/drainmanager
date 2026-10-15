@@ -81,6 +81,22 @@ export async function deleteDitchFromCloud(ditchId: string): Promise<boolean> {
   }
 }
 
+// 2-1. 클라우드 Firestore에서 점검 기록(사진) 삭제
+export async function deleteInspectionFromCloud(inspectionId: string): Promise<boolean> {
+  try {
+    if (!dbInstance) initFirebase();
+    if (!dbInstance) return false;
+
+    const ref = doc(dbInstance, 'inspections', inspectionId);
+    await deleteDoc(ref);
+    console.log('✅ 점검기록(사진) 클라우드 삭제 완료:', inspectionId);
+    return true;
+  } catch (err) {
+    console.warn('❌ 점검기록 클라우드 삭제 실패:', err);
+    return false;
+  }
+}
+
 // 3. 클라우드 Firestore에 점검 기록 저장 (사진 압축 최적화 포함)
 export async function syncInspectionToCloud(record: InspectionRecord): Promise<boolean> {
   try {

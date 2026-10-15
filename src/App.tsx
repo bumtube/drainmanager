@@ -16,6 +16,7 @@ import {
   saveDitch,
   deleteDitch,
   saveInspection,
+  deleteInspection,
   getUserSession,
   saveUserSession,
   setDitchesCache,
@@ -26,6 +27,7 @@ import {
   subscribeToCloudUpdates,
   syncDitchToCloud,
   syncInspectionToCloud,
+  deleteInspectionFromCloud,
   fetchInspectionsFromCloud,
 } from './services/firebase';
 import { MapView } from './components/MapView';
@@ -278,6 +280,20 @@ export const App: React.FC = () => {
     setCapturedPhotoUrl('');
   };
 
+  // 점검 기록 및 사진 삭제 완료
+  const handleDeleteInspection = async (inspectionId: string) => {
+    await deleteInspection(inspectionId);
+    await deleteInspectionFromCloud(inspectionId);
+    await loadData();
+    if (selectedDitch) {
+      const updatedDitches = await getDitches();
+      const updatedTarget = updatedDitches.find((d) => d.id === selectedDitch.id);
+      if (updatedTarget) {
+        setSelectedDitch(updatedTarget);
+      }
+    }
+  };
+
   // 대시보드에서 배수로 지도 이동
   const handleSelectDitchOnMap = (ditch: DitchMaster) => {
     setSelectedDitch(ditch);
@@ -466,6 +482,7 @@ export const App: React.FC = () => {
             setIsQuickFormOpen(false);
             setIsCameraOpen(true);
           }}
+          onRemovePhoto={() => setCapturedPhotoUrl('')}
           onCancel={() => {
             setIsQuickFormOpen(false);
             setCapturedPhotoUrl('');
@@ -479,6 +496,7 @@ export const App: React.FC = () => {
           ditch={selectedDitch}
           inspections={inspections.filter((insp) => insp.ditchId === selectedDitch.id)}
           onClose={() => setIsHistoryOpen(false)}
+          onDeleteInspection={handleDeleteInspection}
         />
       )}
 
