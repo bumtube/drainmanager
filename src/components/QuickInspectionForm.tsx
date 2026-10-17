@@ -159,16 +159,59 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
     }
   };
 
+  // ⚡ 5초 패스트패스: 전부 정상 원클릭 저장
+  const handleFastPassAllGood = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+      now.getDate()
+    ).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(
+      2,
+      '0'
+    )}`;
+
+    const fastRecord: InspectionRecord = {
+      id: `insp-${Date.now()}`,
+      ditchId: ditch.id,
+      inspectedAt: formattedDate,
+      inspectorName,
+      sedimentStatus: '정상',
+      structureStatus: '정상',
+      urgencyLevel: '조치완료',
+      memo: memo.trim() || '현장 점검 완료: 통수 원활 및 구조물 상태 양호 (패스트패스)',
+      photoCurrentUrl: capturedPhotoUrl || previousPhotoUrl || '',
+      photoPreviousUrl: previousPhotoUrl,
+      gpsAccuracy: gpsAccuracy || 3.0,
+      latitude: ditch.latitude,
+      longitude: ditch.longitude,
+    };
+
+    try {
+      await onSave(fastRecord);
+      confetti({
+        particleCount: 70,
+        spread: 70,
+        origin: { y: 0.7 },
+      });
+    } catch (err) {
+      console.error('Fast pass save failed:', err);
+      alert('저장 중 문제가 발생했습니다.');
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-y-auto">
       {/* 1. 상단 바 */}
       <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
         <div>
-          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-            QUICK INSPECTION FORM
+          <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> QUICK INSPECTION
           </span>
           <h2 className="text-lg font-black text-white truncate max-w-[240px] sm:max-w-md">
-            {ditch.name}
+            {ditch.name.replace(/주차장/g, '도로')}
           </h2>
         </div>
         <button
@@ -179,7 +222,32 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 p-4 max-w-lg mx-auto w-full space-y-6 pb-28">
+      <div className="flex-1 p-4 max-w-lg mx-auto w-full space-y-5 pb-28">
+        {/* ⚡ 5초컷 원클릭 전부정상 패스트패스 버튼 */}
+        <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-950 border-2 border-emerald-400/80 rounded-2xl p-3.5 shadow-xl shadow-emerald-950/60 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
+              현장 5초 패스트패스 (FAST-PASS)
+            </span>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold">
+              원터치 완료
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleFastPassAllGood}
+            disabled={isSaving}
+            className="w-full h-12 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm sm:text-base rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+          >
+            <CheckCircle2 className="w-5 h-5 text-slate-950" />
+            <span>{isSaving ? '저장 중...' : '⚡ 이상 없음 · 전부 정상 즉시 저장'}</span>
+          </button>
+          <p className="text-[11px] text-emerald-300/80 text-center leading-tight">
+            퇴적/구조 정상 · 통수 양호 상태로 단 한 번의 터치로 점검을 완료합니다.
+          </p>
+        </div>
+
         {/* 2. 사진 썸네일 & 비포/애프터 비교 영역 */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg">
           <div className="flex items-center justify-between mb-2">

@@ -9,6 +9,8 @@ import {
   syncAlertToCloud,
   deleteAlertFromCloud,
 } from './firebase';
+import { enqueueOfflineItem } from './offlineSync';
+
 
 const DITCHES_KEY = 'dm_ditches_v2';
 const INSPECTIONS_KEY = 'dm_inspections_v2';
@@ -88,8 +90,16 @@ export async function saveDitch(ditch: DitchMaster): Promise<void> {
     current.unshift(ditch);
   }
   await set(DITCHES_KEY, current);
-  // 파이어베이스 클라우드에도 자동 동기화
-  syncDitchToCloud(ditch).catch(() => {});
+  // 파이어베이스 클라우드에도 자동 동기화 (오프라인 시 큐 등록)
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueOfflineItem('ditch', ditch).catch(() => {});
+  } else {
+    syncDitchToCloud(ditch).then((ok) => {
+      if (!ok) enqueueOfflineItem('ditch', ditch).catch(() => {});
+    }).catch(() => {
+      enqueueOfflineItem('ditch', ditch).catch(() => {});
+    });
+  }
 }
 
 // 3. 배수로 삭제 (관리자 전용)
@@ -134,8 +144,16 @@ export async function saveInspection(record: InspectionRecord): Promise<void> {
   inspections.unshift(record);
   await set(INSPECTIONS_KEY, inspections);
 
-  // 파이어베이스 클라우드에도 자동 동기화
-  syncInspectionToCloud(record).catch(() => {});
+  // 파이어베이스 클라우드 자동 동기화 (오프라인 시 큐 등록)
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueOfflineItem('inspection', record).catch(() => {});
+  } else {
+    syncInspectionToCloud(record).then((ok) => {
+      if (!ok) enqueueOfflineItem('inspection', record).catch(() => {});
+    }).catch(() => {
+      enqueueOfflineItem('inspection', record).catch(() => {});
+    });
+  }
 
   // 배수로 마스터의 currentStatus 및 lastInspectedAt 업데이트
   const ditches = await getDitches();
@@ -251,11 +269,15 @@ export async function saveAlert(alert: EmergencyAlert): Promise<void> {
   }
   await set(ALERTS_KEY, alerts);
 
-  // 클라우드 Firestore 실시간 동기화
-  try {
-    await syncAlertToCloud(alert);
-  } catch (err) {
-    console.warn('Failed to sync alert to cloud:', err);
+  // 클라우드 Firestore 실시간 동기화 (오프라인 시 큐 등록)
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueOfflineItem('alert', alert).catch(() => {});
+  } else {
+    syncAlertToCloud(alert).then((ok) => {
+      if (!ok) enqueueOfflineItem('alert', alert).catch(() => {});
+    }).catch(() => {
+      enqueueOfflineItem('alert', alert).catch(() => {});
+    });
   }
 }
 
@@ -265,13 +287,18 @@ export async function deleteAlert(alertId: string): Promise<void> {
   const remaining = alerts.filter((a) => a.id !== alertId);
   await set(ALERTS_KEY, remaining);
 
-  // 클라우드 Firestore에서도 영구 삭제
-  try {
-    await deleteAlertFromCloud(alertId);
-  } catch (err) {
-    console.warn('Failed to delete alert from cloud:', err);
+  // 클라우드 Firestore에서도 영구 삭제 (오프라인 시 큐 등록)
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    enqueueOfflineItem('delete_alert', { id: alertId }).catch(() => {});
+  } else {
+    deleteAlertFromCloud(alertId).then((ok) => {
+      if (!ok) enqueueOfflineItem('delete_alert', { id: alertId }).catch(() => {});
+    }).catch(() => {
+      enqueueOfflineItem('delete_alert', { id: alertId }).catch(() => {});
+    });
   }
 }
+
 
 // 5-6. 클라우드에서 받은 최신 긴급상황 목록 캐시 저장
 export async function setAlertsCache(alerts: EmergencyAlert[]): Promise<void> {

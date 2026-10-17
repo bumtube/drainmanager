@@ -32,6 +32,8 @@ import { exportDitchesAndInspectionsToExcel } from '../services/excelExport';
 import { exportAllDataJson, importAllDataJson, resetToDefaultData } from '../services/storage';
 import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { PrintReportModal } from './PrintReportModal';
+import { ComprehensiveReportModal } from './ComprehensiveReportModal';
+import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 
 
 export type SortField = 'code' | 'name' | 'section' | 'currentStatus' | 'lastInspectedAt';
@@ -69,6 +71,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | DrainStatus>('ALL');
   const [sectionFilter, setSectionFilter] = useState<string>('ALL');
   const [onlyEmergency, setOnlyEmergency] = useState<boolean>(false);
+  const [onlyOverdue, setOnlyOverdue] = useState<boolean>(false);
+
+  // 종합보고서 모달 상태
+  const [isComprehensiveReportOpen, setIsComprehensiveReportOpen] = useState<boolean>(false);
 
   // 테이블 정렬 상태
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -86,13 +92,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editAlertPhotoUrl, setEditAlertPhotoUrl] = useState<string>('');
   const [isSavingAlert, setIsSavingAlert] = useState<boolean>(false);
   const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
-
-
+  const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState<boolean>(false);
 
   // 구역 목록 ('주차장' -> '도로' 변환 반영)
   const sections = Array.from(
     new Set(ditches.map((d) => (d.section === '주차장' ? '도로' : d.section || '도로')))
   );
+
+  // FMS 표준 구역별 요약 지표 (도로, 본관, 별관, 식수)
+  const sectionSummaryList = useMemo(() => {
+    const list = ['도로', '본관', '별관', '식수'];
+    return list.map((sec) => {
+      const secDitches = ditches.filter((d) => (d.section === '주차장' ? '도로' : d.section || '도로') === sec);
+      const total = secDitches.length;
+      const goodCount = secDitches.filter((d) => d.currentStatus === 'GOOD').length;
+      const issueCount = secDitches.filter((d) => d.currentStatus === 'WARNING' || d.currentStatus === 'DANGER').length;
+      const overdueCount = secDitches.filter((d) => getDitchOverdueInfo(d, 14).isOverdue).length;
+      return {
+        section: sec,
+        total,
+        goodCount,
+        issueCount,
+        overdueCount,
+      };
+    });
+  }, [ditches]);
 
   // 필터링된 배수로 목록
   const filteredDitches = ditches.filter((d) => {
@@ -105,8 +129,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const currentSection = d.section === '주차장' ? '도로' : d.section;
     const matchSection = sectionFilter === 'ALL' || currentSection === sectionFilter;
     const matchEmergency = !onlyEmergency || d.currentStatus === 'DANGER';
+    const matchOverdue = !onlyOverdue || getDitchOverdueInfo(d, 14).isOverdue;
 
-    return matchSearch && matchStatus && matchSection && matchEmergency;
+    return matchSearch && matchStatus && matchSection && matchEmergency && matchOverdue;
   });
 
   // 정렬 핸들러
@@ -209,6 +234,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const countGood = ditches.filter((d) => d.currentStatus === 'GOOD').length;
   const countWarning = ditches.filter((d) => d.currentStatus === 'WARNING').length;
   const countDanger = ditches.filter((d) => d.currentStatus === 'DANGER').length;
+  const overdueDitches = ditches.filter((d) => getDitchOverdueInfo(d, 14).isOverdue);
+  const countOverdue = overdueDitches.length;
 
   // 엑셀 내보내기
   const handleExportExcel = () => {
@@ -295,233 +322,347 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="flex-1 bg-slate-950 text-slate-100 overflow-y-auto p-4 sm:p-6 space-y-6">
-      {/* 1. 상단 통계 카드 (5열 반응형 그리드) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow">
-          <span className="text-xs text-slate-400 font-bold block">총 관리 배수로</span>
-          <span className="text-2xl sm:text-3xl font-black text-white">{ditches.length}개소</span>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow">
-          <span className="text-xs text-emerald-400 font-bold block flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" /> 통수 정상
-          </span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-400">{countGood}개소</span>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow">
-          <span className="text-xs text-amber-400 font-bold block flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5" /> 관찰 / 준설필요
-          </span>
-          <span className="text-2xl sm:text-3xl font-black text-amber-400">{countWarning}개소</span>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow">
-          <span className="text-xs text-rose-400 font-bold block flex items-center gap-1">
-            <Flame className="w-3.5 h-3.5" /> 긴급조치 요망
-          </span>
-          <span className="text-2xl sm:text-3xl font-black text-rose-400">{countDanger}개소</span>
-        </div>
-        <div
-          className={`p-4 rounded-2xl shadow border transition-all ${
-            alerts.length > 0
-              ? 'bg-rose-950/40 border-rose-500/70 shadow-lg shadow-rose-950/50'
-              : 'bg-slate-900 border-slate-800'
-          }`}
-        >
-          <span className="text-xs text-rose-400 font-bold block flex items-center gap-1">
-            <Siren className={`w-3.5 h-3.5 ${alerts.length > 0 ? 'text-rose-400 animate-spin' : ''}`} />
-            긴급상황 경광등
-          </span>
-          <span
-            className={`text-2xl sm:text-3xl font-black flex items-center gap-1.5 ${
-              alerts.length > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-400'
-            }`}
-          >
-            {alerts.length}건
-            {alerts.length > 0 && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white animate-bounce">
-                발생
+    <div className="flex-1 bg-slate-950 text-slate-100 overflow-y-auto p-3 sm:p-5 space-y-4">
+      {/* 1. ZONE 1: FMS 통합 요약 위젯 (KPI 지표 + 4개 구역 관리 진도 현황) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          {/* 좌측: 5대 핵심 상태 지표 (원터치 즉시 필터링 탭) */}
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <h2 className="text-xs font-black text-slate-300 uppercase tracking-wider">
+                  배수로 시설물 종합 관리 현황
+                </h2>
+              </div>
+              {(statusFilter !== 'ALL' || onlyEmergency || onlyOverdue || sectionFilter !== 'ALL' || searchTerm) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('ALL');
+                    setSectionFilter('ALL');
+                    setOnlyEmergency(false);
+                    setOnlyOverdue(false);
+                    setSearchTerm('');
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 transition-colors"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  필터 초기화
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {/* 전체 배수로 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter('ALL');
+                  setOnlyEmergency(false);
+                  setOnlyOverdue(false);
+                }}
+                className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-95 ${
+                  statusFilter === 'ALL' && !onlyEmergency && !onlyOverdue
+                    ? 'bg-slate-800 border-blue-500 ring-2 ring-blue-500/30 text-white'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300'
+                }`}
+                title="전체 배수로 보기"
+              >
+                <span className="text-[11px] text-slate-400 font-semibold block">총 관리 수량</span>
+                <span className="text-lg sm:text-2xl font-black text-white">
+                  {ditches.length}
+                  <span className="text-xs font-normal text-slate-400 ml-1">개소</span>
+                </span>
+              </button>
+
+              {/* 통수 정상 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter(statusFilter === 'GOOD' ? 'ALL' : 'GOOD');
+                  setOnlyEmergency(false);
+                  setOnlyOverdue(false);
+                }}
+                className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-95 ${
+                  statusFilter === 'GOOD'
+                    ? 'bg-emerald-950/60 border-emerald-400 ring-2 ring-emerald-500/30 text-white'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-emerald-500/50 text-slate-300'
+                }`}
+                title="정상 배수로 필터링"
+              >
+                <span className="text-[11px] text-emerald-400 font-semibold block flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> 통수 정상
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-emerald-400">
+                  {countGood}
+                  <span className="text-xs font-normal text-emerald-500/70 ml-1">개소</span>
+                </span>
+              </button>
+
+              {/* 주의 (준설요망) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter(statusFilter === 'WARNING' ? 'ALL' : 'WARNING');
+                  setOnlyEmergency(false);
+                  setOnlyOverdue(false);
+                }}
+                className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-95 ${
+                  statusFilter === 'WARNING'
+                    ? 'bg-amber-950/60 border-amber-400 ring-2 ring-amber-500/30 text-white'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-amber-500/50 text-slate-300'
+                }`}
+                title="주의(준설요망) 배수로 필터링"
+              >
+                <span className="text-[11px] text-amber-400 font-semibold block flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> 준설 요망
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-amber-400">
+                  {countWarning}
+                  <span className="text-xs font-normal text-amber-500/70 ml-1">개소</span>
+                </span>
+              </button>
+
+              {/* 긴급 조치 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setOnlyEmergency((prev) => !prev);
+                  setStatusFilter('ALL');
+                  setOnlyOverdue(false);
+                }}
+                className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-95 ${
+                  onlyEmergency
+                    ? 'bg-rose-950/70 border-rose-400 ring-2 ring-rose-500/30 text-white'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-rose-500/50 text-slate-300'
+                }`}
+                title="긴급조치 대상 필터링"
+              >
+                <span className="text-[11px] text-rose-400 font-semibold block flex items-center gap-1">
+                  <Flame className="w-3 h-3" /> 긴급 조치
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-rose-400">
+                  {countDanger}
+                  <span className="text-xs font-normal text-rose-500/70 ml-1">개소</span>
+                </span>
+              </button>
+
+              {/* 14일+ 장기 미점검 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setOnlyOverdue((prev) => !prev);
+                  setStatusFilter('ALL');
+                  setOnlyEmergency(false);
+                }}
+                className={`p-2.5 sm:p-3 rounded-xl border text-left transition-all active:scale-95 col-span-2 sm:col-span-1 ${
+                  onlyOverdue
+                    ? 'bg-amber-950/80 border-amber-400 ring-2 ring-amber-500/30 text-white'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-amber-500/50 text-slate-300'
+                }`}
+                title="14일 이상 미점검 시설물 필터링"
+              >
+                <span className="text-[11px] text-amber-400 font-semibold block flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> 14일+ 미점검
+                </span>
+                <span className="text-lg sm:text-2xl font-black text-amber-400">
+                  {countOverdue}
+                  <span className="text-xs font-normal text-amber-500/70 ml-1">개소</span>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* 우측: 4대 구역별 현황 미니 프로그레스 바 (FMS 표준 구역 모니터링) */}
+          <div className="lg:w-72 bg-slate-950/60 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-300 pb-1 border-b border-slate-800/60">
+              <span className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-400" /> 구역별 관리 현황
               </span>
-            )}
-          </span>
+              <span className="text-[10px] text-slate-400">총 4개 구역</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {sectionSummaryList.map((sec) => (
+                <button
+                  key={sec.section}
+                  type="button"
+                  onClick={() => setSectionFilter(sectionFilter === sec.section ? 'ALL' : sec.section)}
+                  className={`p-2 rounded-lg border text-left transition-all active:scale-95 ${
+                    sectionFilter === sec.section
+                      ? 'bg-slate-850 border-blue-400 text-white shadow-sm ring-1 ring-blue-400/50'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                  }`}
+                  title={`${sec.section} 구역 필터링`}
+                >
+                  <div className="flex justify-between items-center text-[11px] font-bold">
+                    <span>{sec.section === '식수' ? '🌲 식수' : sec.section}</span>
+                    <span className="font-mono text-slate-400">{sec.total}개소</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1 text-[10px]">
+                    <span className="text-emerald-400">{sec.goodCount} 정상</span>
+                    {sec.issueCount > 0 && <span className="text-amber-400 font-semibold">· {sec.issueCount} 주의</span>}
+                    {sec.overdueCount > 0 && <span className="text-rose-400 font-semibold">· {sec.overdueCount} 지연</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* 2. 실시간 긴급상황 경광등 관리 현황 섹션 */}
-      <div
-        className={`rounded-2xl p-4 sm:p-5 border transition-all ${
-          alerts.length > 0
-            ? 'bg-rose-950/25 border-rose-500/60 shadow-xl shadow-rose-950/40'
-            : 'bg-slate-900 border-slate-800'
-        }`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800/80 mb-3">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                alerts.length > 0
-                  ? 'bg-rose-600 text-white animate-bounce shadow-md shadow-rose-900'
-                  : 'bg-slate-800 text-slate-400'
-              }`}
-            >
+      {/* 2. 🚨 긴급상황 경광등 슬림 알림 바 (평상시 0건일 땐 숨김, 발생 시에만 1줄로 컴팩트 노출) */}
+      {alerts.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-950 via-rose-900 to-rose-950 border-2 border-rose-500/80 rounded-2xl p-3 sm:p-4 shadow-xl shadow-rose-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-950 animate-bounce">
               <Siren className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  실시간 긴급상황 경광등 현황
-                </h3>
-                {alerts.length > 0 ? (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-black bg-rose-500 text-white animate-pulse">
-                    {alerts.length}건 대기 중
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    안전 유지 중
+                <span className="text-xs font-black px-2 py-0.5 rounded-full bg-rose-600 text-white animate-pulse">
+                  🚨 긴급상황 경광등 {alerts.length}건 발생 중
+                </span>
+                <span className="text-[11px] text-rose-300 font-mono hidden sm:inline">
+                  최근: {alerts[0]?.createdFormatted}
+                </span>
+              </div>
+              <p className="text-sm font-black text-white mt-0.5 flex items-center gap-1.5">
+                <span>{alerts[0]?.message || '현장 긴급상황 발생'}</span>
+                {alerts.length > 1 && (
+                  <span className="text-xs text-rose-300 font-normal">
+                    (외 {alerts.length - 1}건)
                   </span>
                 )}
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                현장에서 사용자가 등록한 긴급상황 경광등 위치를 즉시 확인하고, 상황 종료 시 삭제(해제)할 수 있습니다.
               </p>
             </div>
           </div>
-        </div>
 
-        {alerts.length === 0 ? (
-          <div className="py-4 text-center text-slate-400 text-xs flex items-center justify-center gap-2 bg-slate-950/40 rounded-xl border border-slate-850">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>현재 접수된 긴급상황 경광등이 없습니다. (현장 시설물 정상 운영 중)</span>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsAlertsDrawerOpen(true)}
+              className="px-4 h-9 bg-white hover:bg-slate-100 text-rose-950 font-black text-xs rounded-xl shadow active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              <span>경광등 상세·조치 ({alerts.length})</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="bg-slate-900 border border-rose-500/50 rounded-xl p-3.5 space-y-3 shadow-md flex flex-col justify-between hover:border-rose-400 transition-colors"
+        </div>
+      )}
+
+      {/* 3. ZONE 2: 원-라인 통합 컨트롤 툴바 (검색 + 구역/상태 필터 + 보고서/엑셀/백업/복원) */}
+      <div className="bg-slate-900 border border-slate-800 p-3 sm:p-3.5 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow">
+        {/* 좌측: 검색 & 드롭다운 필터 */}
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          {/* 검색창 */}
+          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="배수로 명칭, 번호, 주소 검색..."
+              className="w-full h-10 pl-9 pr-8 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-black bg-rose-600 text-white flex items-center gap-1 shadow-sm">
-                      <Siren className="w-3 h-3" />
-                      긴급 경광등
-                    </span>
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                      <Clock className="w-3 h-3 text-slate-500" />
-                      {alert.createdFormatted}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-black text-rose-300 mt-2.5 flex items-center gap-1.5">
-                    {alert.message || '🚨 현장 긴급상황 발생'}
-                  </h4>
-
-                  {/* 현장 사진 썸네일 (등록된 경우) */}
-                  {alert.photoUrl ? (
-                    <div className="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 mt-2.5 group">
-                      <img
-                        src={alert.photoUrl}
-                        alt="긴급상황 현장 사진"
-                        className="w-full h-28 object-cover cursor-pointer hover:opacity-95 transition-all"
-                        onClick={() => setEnlargedAlertPhoto(alert.photoUrl!)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setEnlargedAlertPhoto(alert.photoUrl!)}
-                        className="absolute bottom-1.5 right-1.5 px-2 py-0.5 bg-slate-900/85 hover:bg-slate-900 text-white text-[10px] font-bold rounded backdrop-blur-sm border border-slate-700 flex items-center gap-1 shadow active:scale-95 transition-all"
-                      >
-                        <Maximize2 className="w-3 h-3 text-blue-400" />
-                        사진 확대
-                      </button>
-                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-rose-600/90 text-white text-[9px] font-bold rounded flex items-center gap-1 shadow">
-                        <Camera className="w-2.5 h-2.5" />
-                        현장 사진
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2 py-1 px-2.5 rounded-lg bg-slate-950/40 border border-slate-800 text-[10px] text-slate-500 flex items-center gap-1.5">
-                      <ImageIcon className="w-3 h-3 text-slate-600" />
-                      <span>등록된 현장 사진 없음</span>
-                    </div>
-                  )}
-
-                  <div className="text-xs text-slate-300 mt-2 space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
-                    <div className="flex justify-between font-mono text-[11px]">
-                      <span className="text-slate-400 font-sans">발생 좌표:</span>
-                      <span className="text-slate-300">
-                        {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
-                  <button
-                    type="button"
-                    onClick={() => onSelectAlertOnMap?.(alert)}
-                    className="flex-1 h-9 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                  >
-                    <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                    지도에서 보기
-                  </button>
-                  {onUpdateAlert && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingAlertTarget(alert);
-                        setEditAlertMessage(alert.message || '🚨 현장 긴급상황 발생');
-                        setEditAlertPhotoUrl(alert.photoUrl || '');
-                      }}
-                      className="h-9 px-3 bg-slate-800 hover:bg-blue-600 hover:text-white text-blue-300 border border-slate-700 font-bold text-xs rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all"
-                      title="경광등 내용 및 사진 수정"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      수정
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAlertConfirm(alert)}
-                    className="h-9 px-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1 shadow active:scale-95 transition-all"
-                    title="상황 종료 후 경광등 해제(삭제)"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    해제(삭제)
-                  </button>
-                </div>
-              </div>
-            ))}
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* 2. 관리자 툴바 & 리포트 추출 액션 */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-        <div>
-          <h2 className="text-lg font-black text-white">배수로 점검 총괄표 & 리포트</h2>
-          <p className="text-xs text-slate-400">
-            총 {inspections.length}건의 현장 점검 이력이 누적되어 있습니다.
-          </p>
+          {/* 구역 드롭다운 */}
+          <select
+            value={sectionFilter}
+            onChange={(e) => setSectionFilter(e.target.value)}
+            className="h-10 px-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-blue-500"
+          >
+            <option value="ALL">전체 구역 ({ditches.length})</option>
+            {sections.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          {/* 상태 드롭다운 */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="h-10 px-3 bg-slate-950 border border-slate-700 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-blue-500"
+          >
+            <option value="ALL">전체 상태 등급</option>
+            <option value="GOOD">정상 ({countGood})</option>
+            <option value="WARNING">주의 (준설요망: {countWarning})</option>
+            <option value="DANGER">긴급 (위험: {countDanger})</option>
+          </select>
+
+          {/* 표시 건수 및 정렬 초기화 */}
+          <div className="flex items-center gap-2 ml-1">
+            <span className="text-xs text-slate-400 font-mono">
+              <strong className="text-white">{sortedDitches.length}</strong> / {ditches.length}개소
+            </span>
+            {sortField && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSortField(null);
+                  setSortDirection('asc');
+                }}
+                className="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1 active:scale-95 transition-all ml-1"
+                title="정렬 초기화"
+              >
+                <RefreshCw className="w-3 h-3" />
+                정렬초기화
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {/* 엑셀 다운로드 */}
+        {/* 우측: 보고서 & 엑셀 & 백업 버튼 그룹 */}
+        <div className="flex items-center gap-2 shrink-0 overflow-x-auto pb-1 lg:pb-0">
+          {/* 주간/월간 종합보고서 (1-클릭) */}
+          <button
+            onClick={() => setIsComprehensiveReportOpen(true)}
+            className="h-10 px-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md shadow-blue-950/60 active:scale-95 transition-all shrink-0"
+            title="주간 및 월간 유지관리 종합보고서 1-클릭 인쇄/PDF 생성"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>종합보고서 (1-클릭)</span>
+          </button>
+
+          {/* 엑셀 총괄표 다운로드 */}
           <button
             onClick={handleExportExcel}
-            className="h-11 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+            className="h-10 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-950/60 active:scale-95 transition-all shrink-0"
+            title="전체 배수로 및 점검기록 엑셀(XLSX) 다운로드"
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            엑셀(XLSX) 총괄표 다운로드
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>엑셀(XLSX)</span>
           </button>
 
-          {/* 백업/복원 드롭다운 */}
+          {/* 백업 */}
           <button
             onClick={handleExportBackup}
-            className="h-11 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-1.5"
-            title="전체 데이터 JSON 백업"
+            className="h-10 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-1 border border-slate-700 active:scale-95 transition-all shrink-0"
+            title="전체 데이터 JSON 백업 파일 다운로드"
           >
-            <Download className="w-4 h-4" /> 백업
+            <Download className="w-3.5 h-3.5" />
+            <span>백업</span>
           </button>
-          <label className="h-11 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer">
-            <Upload className="w-4 h-4" /> 복원
+
+          {/* 복원 */}
+          <label
+            className="h-10 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl flex items-center gap-1 border border-slate-700 cursor-pointer active:scale-95 transition-all shrink-0"
+            title="JSON 백업 파일로 복원"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>복원</span>
             <input
               type="file"
               accept=".json"
@@ -529,86 +670,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               className="hidden"
             />
           </label>
-        </div>
-      </div>
-
-      {/* 3. 검색 및 필터 컨트롤 */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* 검색창 */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="배수로 명칭, 관리번호, 주소 검색..."
-              className="w-full h-11 pl-10 pr-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* 구역 필터 */}
-          <div className="flex gap-2">
-            <select
-              value={sectionFilter}
-              onChange={(e) => setSectionFilter(e.target.value)}
-              className="h-11 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-semibold"
-            >
-              <option value="ALL">전체 공구/구역</option>
-              {sections.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-
-            {/* 상태 필터 */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="h-11 px-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-xs font-semibold"
-            >
-              <option value="ALL">전체 상태 등급</option>
-              <option value="GOOD">정상</option>
-              <option value="WARNING">주의 (준설요망)</option>
-              <option value="DANGER">긴급 (위험)</option>
-            </select>
-          </div>
-        </div>
-
-        {/* 긴급조치 토글 필터 & 정렬 안내 */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setOnlyEmergency((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                onlyEmergency
-                  ? 'bg-rose-600 border-rose-400 text-white shadow'
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Flame className="w-3.5 h-3.5 text-rose-300" />
-              긴급조치 대상 배수로만 보기
-            </button>
-            <span className="text-xs text-slate-500">
-              총 {sortedDitches.length}개소 표시 중
-            </span>
-          </div>
-
-          {sortField && (
-            <button
-              type="button"
-              onClick={() => {
-                setSortField(null);
-                setSortDirection('asc');
-              }}
-              className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 active:scale-95 transition-all"
-            >
-              <RefreshCw className="w-3 h-3" />
-              정렬 초기화
-            </button>
-          )}
         </div>
       </div>
 
@@ -771,20 +832,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             : '긴급'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-400 text-xs hidden sm:table-cell">
-                        {ditch.lastInspectedAt || '미점검'}
+                      <td className="py-3 px-4 text-xs hidden sm:table-cell">
+                        {(() => {
+                          const overdue = getDitchOverdueInfo(ditch, 14);
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-slate-300 font-mono">
+                                {ditch.lastInspectedAt || '미점검'}
+                              </span>
+                              {overdue.isOverdue && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-950/60 border border-amber-500/40 px-1.5 py-0.5 rounded w-fit">
+                                  <AlertTriangle className="w-2.5 h-2.5 text-amber-400" />
+                                  {overdue.daysElapsed === 999 ? '미점검 방치' : `${overdue.daysElapsed}일 경과`}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center justify-center gap-1">
                           {/* 점검이력 및 사진 열람 버튼 */}
                           <button
                             type="button"
                             onClick={() => onOpenHistory?.(ditch)}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-950/60 hover:bg-emerald-600 hover:text-white text-emerald-300 border border-emerald-600/50 flex items-center gap-1 active:scale-95 transition-all"
+                            className="h-8 px-2.5 rounded-lg text-xs font-bold bg-emerald-950/70 hover:bg-emerald-600 hover:text-white text-emerald-300 border border-emerald-600/50 flex items-center gap-1 active:scale-95 transition-all shadow-sm"
                             title="과거 점검 이력 및 현장 사진 조회 (타임라인)"
                           >
                             <ClipboardList className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">이력/사진</span>
+                            <span>이력/사진</span>
+                          </button>
+
+                          {/* 사진대지 인쇄 버튼 */}
+                          <button
+                            type="button"
+                            onClick={() => openPrintReport(ditch)}
+                            disabled={!hasInspection}
+                            className={`h-8 px-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                              hasInspection
+                                ? 'bg-slate-800 hover:bg-blue-600 hover:text-white text-blue-300 border border-slate-700 active:scale-95 shadow-sm'
+                                : 'bg-slate-900 text-slate-600 cursor-not-allowed border border-transparent opacity-60'
+                            }`}
+                            title={hasInspection ? '사진대지 A4 인쇄' : '점검기록 없음'}
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span className="hidden xl:inline">사진대지</span>
+                          </button>
+
+                          {/* 지도에서 보기 버튼 */}
+                          <button
+                            type="button"
+                            onClick={() => onSelectDitchOnMap(ditch)}
+                            className="h-8 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1 active:scale-95 transition-all"
+                            title="지도에서 위치 확인"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="hidden xl:inline">지도</span>
                           </button>
 
                           {/* 배수로 정보 수정 버튼 */}
@@ -792,51 +895,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <button
                               type="button"
                               onClick={() => onOpenEdit(ditch)}
-                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-blue-600 hover:text-white text-blue-300 border border-slate-700 flex items-center gap-1 active:scale-95 transition-all"
+                              className="h-8 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1 active:scale-95 transition-all"
                               title="배수로 제원 및 위치 정보 수정"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">수정</span>
                             </button>
                           )}
-
-                          {/* 사진대지 인쇄 버튼 */}
-                          <button
-                            type="button"
-                            onClick={() => openPrintReport(ditch)}
-                            disabled={!hasInspection}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                              hasInspection
-                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95'
-                                : 'bg-slate-900 text-slate-600 cursor-not-allowed border border-transparent'
-                            }`}
-                            title={hasInspection ? '사진대지 A4 인쇄' : '점검기록 없음'}
-                          >
-                            <Printer className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="hidden md:inline">사진대지</span>
-                          </button>
-
-                          {/* 지도에서 보기 버튼 */}
-                          <button
-                            type="button"
-                            onClick={() => onSelectDitchOnMap(ditch)}
-                            className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1 active:scale-95 transition-all"
-                            title="지도에서 위치 확인"
-                          >
-                            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="hidden md:inline">지도</span>
-                          </button>
 
                           {/* 배수로 등록데이터 영구 삭제 버튼 */}
                           {onDeleteDitch && (
                             <button
                               type="button"
                               onClick={() => handleDeleteDitchConfirm(ditch)}
-                              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-rose-600 hover:text-white text-rose-400 border border-slate-700 hover:border-rose-500 flex items-center gap-1 active:scale-95 transition-all"
+                              className="h-8 px-2 rounded-lg text-xs font-bold bg-slate-800 hover:bg-rose-600 hover:text-white text-rose-400 border border-slate-700 hover:border-rose-500 flex items-center gap-1 active:scale-95 transition-all"
                               title="배수로 등록데이터 삭제"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">삭제</span>
                             </button>
                           )}
                         </div>
@@ -1124,6 +1198,171 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* 🚨 긴급상황 경광등 현황 및 조치 전용 모달 (FMS 비상 대응 콘솔) */}
+      {isAlertsDrawerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border-2 border-rose-500/80 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden text-white">
+            {/* 상단 타이틀 바 */}
+            <div className="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center animate-bounce shadow">
+                  <Siren className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white text-base flex items-center gap-2">
+                    실시간 긴급상황 경광등 관리 현황
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold">
+                      {alerts.length}건 발생
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    현장에서 접수된 긴급상황 위치와 사진을 확인하고, 상황 종료 시 즉시 해제(삭제)합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAlertsDrawerOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 경광등 목록 바디 */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1 bg-slate-950/40">
+              {alerts.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm flex flex-col items-center justify-center gap-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                  <span>현재 접수된 긴급상황 경광등이 없습니다.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="bg-slate-900 border border-rose-500/50 rounded-xl p-3.5 space-y-3 shadow-md flex flex-col justify-between hover:border-rose-400 transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-black bg-rose-600 text-white flex items-center gap-1 shadow-sm">
+                            <Siren className="w-3 h-3" />
+                            긴급 경광등
+                          </span>
+                          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                            <Clock className="w-3 h-3 text-slate-500" />
+                            {alert.createdFormatted}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-black text-rose-300 mt-2.5 flex items-center gap-1.5">
+                          {alert.message || '🚨 현장 긴급상황 발생'}
+                        </h4>
+
+                        {/* 현장 사진 썸네일 */}
+                        {alert.photoUrl ? (
+                          <div className="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 mt-2.5 group">
+                            <img
+                              src={alert.photoUrl}
+                              alt="긴급상황 현장 사진"
+                              className="w-full h-28 object-cover cursor-pointer hover:opacity-95 transition-all"
+                              onClick={() => setEnlargedAlertPhoto(alert.photoUrl!)}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setEnlargedAlertPhoto(alert.photoUrl!)}
+                              className="absolute bottom-1.5 right-1.5 px-2 py-0.5 bg-slate-900/85 hover:bg-slate-900 text-white text-[10px] font-bold rounded backdrop-blur-sm border border-slate-700 flex items-center gap-1 shadow active:scale-95 transition-all"
+                            >
+                              <Maximize2 className="w-3 h-3 text-blue-400" />
+                              사진 확대
+                            </button>
+                            <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-rose-600/90 text-white text-[9px] font-bold rounded flex items-center gap-1 shadow">
+                              <Camera className="w-2.5 h-2.5" />
+                              현장 사진
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-2 py-1 px-2.5 rounded-lg bg-slate-950/40 border border-slate-800 text-[10px] text-slate-500 flex items-center gap-1.5">
+                            <ImageIcon className="w-3 h-3 text-slate-600" />
+                            <span>등록된 현장 사진 없음</span>
+                          </div>
+                        )}
+
+                        <div className="text-xs text-slate-300 mt-2 space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                          <div className="flex justify-between font-mono text-[11px]">
+                            <span className="text-slate-400 font-sans">발생 좌표:</span>
+                            <span className="text-slate-300">
+                              {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAlertsDrawerOpen(false);
+                            onSelectAlertOnMap?.(alert);
+                          }}
+                          className="flex-1 h-9 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                          지도에서 보기
+                        </button>
+                        {onUpdateAlert && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingAlertTarget(alert);
+                              setEditAlertMessage(alert.message || '🚨 현장 긴급상황 발생');
+                              setEditAlertPhotoUrl(alert.photoUrl || '');
+                            }}
+                            className="h-9 px-3 bg-slate-800 hover:bg-blue-600 hover:text-white text-blue-300 border border-slate-700 font-bold text-xs rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all"
+                            title="경광등 내용 및 사진 수정"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            수정
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAlertConfirm(alert)}
+                          className="h-9 px-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1 shadow active:scale-95 transition-all"
+                          title="상황 종료 후 경광등 해제(삭제)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          해제(삭제)
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 하단 닫기 바 */}
+            <div className="px-5 py-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsAlertsDrawerOpen(false)}
+                className="px-5 h-10 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📊 주간/월간 유지관리 종합보고서 1-클릭 인쇄/PDF 모달 */}
+      <ComprehensiveReportModal
+        isOpen={isComprehensiveReportOpen}
+        onClose={() => setIsComprehensiveReportOpen(false)}
+        ditches={ditches}
+        inspections={inspections}
+        alerts={alerts}
+      />
     </div>
   );
 };

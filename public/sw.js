@@ -1,7 +1,7 @@
 // 배수로 지킴이 (Drainage Master) PWA Service Worker
 // 지도 타일 영구 오프라인 캐싱 및 앱 리소스 캐시
 
-const CACHE_NAME = 'drainmanager-app-v1';
+const CACHE_NAME = 'drainmanager-app-v2';
 const MAP_TILES_CACHE = 'drainmanager-map-tiles-v1';
 
 // 설치 시 즉시 활성화
@@ -9,7 +9,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 활성화 시 구버전 캐시 정리
+// 활성화 시 구버전 캐시 정리 및 클라이언트 제어 시작
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -36,13 +36,26 @@ self.addEventListener('fetch', (event) => {
   if (isMapTile) {
     event.respondWith(
       caches.open(MAP_TILES_CACHE).then(async (cache) => {
-        // A. 캐시에 저장된 타일이 있으면 네트워크 요청 없이 즉시 반환 (데이터 소모 0)
-        const cachedResponse = await cache.match(event.request);
+        // A. 요청 URL과 직접 매칭
+        let cachedResponse = await cache.match(event.request);
         if (cachedResponse) {
           return cachedResponse;
         }
 
-        // B. 캐시에 없으면 다운로드 후 영구 캐시에 저장
+        // B. OSM 서브도메인(a., b., c.) 교차 매칭 지원
+        if (url.hostname.includes('tile.openstreetmap.org')) {
+          const directMatch =
+            (await cache.match(`https://a.tile.openstreetmap.org${url.pathname}`)) ||
+            (await cache.match(`https://b.tile.openstreetmap.org${url.pathname}`)) ||
+            (await cache.match(`https://c.tile.openstreetmap.org${url.pathname}`)) ||
+            (await cache.match(`https://tile.openstreetmap.org${url.pathname}`));
+
+          if (directMatch) {
+            return directMatch;
+          }
+        }
+
+        // C. 캐시에 없으면 네트워크에서 다운로드 후 영구 캐시에 보관
         try {
           const networkResponse = await fetch(event.request);
           if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
@@ -50,8 +63,16 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         } catch (error) {
-          // 오프라인 상태이고 캐시에도 없는 경우 기본 반환
-          return cachedResponse || new Response('Offline tile unavailable', { status: 503 });
+          // 완전 오프라인이고 캐시에도 없는 외곽 타일일 경우, 엑박 방지용 짙은 슬레이트 투명 타일 반환
+          const fallbackSvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+              <rect width="256" height="256" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+            </svg>
+          `;
+          return new Response(fallbackSvg, {
+            headers: { 'Content-Type': 'image/svg+xml' },
+            status: 200,
+          });
         }
       })
     );

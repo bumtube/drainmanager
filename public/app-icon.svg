@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#000000" />
+    </linearGradient>
+
+    <!-- Water & Stream Gradient -->
+    <linearGradient id="streamGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+
+    <!-- Emerald Shield Gradient -->
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <!-- Gold Accent Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Soft Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="subtleShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- 1. Background Squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#334155" stroke-width="3" opacity="0.6" />
+
+  <!-- 2. Subtle Grid & Water Wave Lines (Drainage Channel Perspective) -->
+  <g opacity="0.3" stroke="#38bdf8" stroke-width="2" stroke-linecap="round">
+    <!-- Channel perspective lines -->
+    <line x1="120" y1="440" x2="200" y2="240" />
+    <line x1="392" y1="440" x2="312" y2="240" />
+    <line x1="160" y1="440" x2="225" y2="240" stroke-dasharray="8 8" />
+    <line x1="352" y1="440" x2="287" y2="240" stroke-dasharray="8 8" />
+  </g>
+
+  <!-- 3. Flowing Water Channel (배수로 통수 수로) -->
+  <path d="M 170 440 L 220 240 Q 256 220 292 240 L 342 440 Z" fill="url(#streamGrad)" opacity="0.85" filter="url(#glow)" />
+  
+  <!-- Water flow ripple highlights -->
+  <path d="M 215 320 Q 256 305 297 320" fill="none" stroke="#e0f2fe" stroke-width="4" stroke-linecap="round" opacity="0.8" />
+  <path d="M 195 380 Q 256 365 317 380" fill="none" stroke="#e0f2fe" stroke-width="5" stroke-linecap="round" opacity="0.9" />
+
+  <!-- 4. Drainage Channel Structure Walls (U형 배수로 측벽) -->
+  <path d="M 120 440 L 200 240 L 220 240 L 160 440 Z" fill="#64748b" opacity="0.9" />
+  <path d="M 392 440 L 312 240 L 292 240 L 352 440 Z" fill="#475569" opacity="0.9" />
+  <polygon points="120,440 160,440 160,450 120,450" fill="#334155" />
+  <polygon points="352,440 392,440 392,450 352,450" fill="#334155" />
+
+  <!-- 5. Central Safety Shield & Location Pin Badge (안전 점검 방패 및 마커) -->
+  <g transform="translate(256, 170)" filter="url(#subtleShadow)">
+    <!-- Shield Outer -->
+    <path d="M 0 -85 C 45 -85 75 -75 75 -75 C 75 10 50 65 0 95 C -50 65 -75 10 -75 -75 C -75 -75 -45 -85 0 -85 Z"
+          fill="url(#shieldGrad)" stroke="#ffffff" stroke-width="6" />
+
+    <!-- Checkmark inside Shield -->
+    <path d="M -26 -3 L -7 18 L 30 -22" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Lightning Fast-Pass Accent (Top Right) -->
+    <path d="M 40 -105 L 20 -70 L 38 -70 L 25 -40 L 55 -65 L 38 -65 Z" fill="url(#goldGrad)" stroke="#ffffff" stroke-width="2" />
+  </g>
+
+  <!-- 6. App Title Text Accent (Drainage Master) -->
+  <text x="256" y="482" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif" font-size="28" font-weight="900" fill="#94a3b8" letter-spacing="4">
+    배수로 지킴이
+  </text>
+</svg>

@@ -10,7 +10,7 @@ createRoot(document.getElementById('root')!).render(
 )
 
 // PWA Service Worker 등록 (오프라인 지도 및 리소스 영구 캐싱)
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')

@@ -1,18 +1,33 @@
 {
+  "id": "com.drainmanager.pwa",
   "name": "배수로 지킴이 (Drainage Master)",
-  "short_name": "배수로점검",
-  "description": "현장 맞춤형 배수로 위치 및 상태 점검 웹앱",
+  "short_name": "배수로지킴이",
+  "description": "불정로 50 부지 배수로 실시간 상태 점검 및 스마트 FMS",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay", "fullscreen"],
   "background_color": "#020617",
   "theme_color": "#020617",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "categories": ["utilities", "productivity", "business"],
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/app-icon.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "48x48",
+      "type": "image/svg+xml"
     }
   ]
 }

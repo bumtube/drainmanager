@@ -20,9 +20,12 @@ import {
   Trash2,
   Maximize2,
   Image as ImageIcon,
+  Zap,
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
 import { fileToBase64Compressed } from '../services/imageOptimizer';
+import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 
 
 interface MapViewProps {
@@ -45,6 +48,7 @@ interface MapViewProps {
   onUpdateAlert?: (alert: EmergencyAlert) => Promise<void> | void;
   selectedAlert?: EmergencyAlert | null;
   onSelectAlert?: (alert: EmergencyAlert | null) => void;
+  onFastPassInspection?: (ditch: DitchMaster) => Promise<void> | void;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -67,6 +71,7 @@ export const MapView: React.FC<MapViewProps> = ({
   onUpdateAlert,
   selectedAlert: externalSelectedAlert,
   onSelectAlert,
+  onFastPassInspection,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -75,6 +80,9 @@ export const MapView: React.FC<MapViewProps> = ({
   const alertsLayerRef = useRef<L.LayerGroup | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userCircleRef = useRef<L.Circle | null>(null);
+
+  // ⚡ 5초 패스트패스 진행 중 상태
+  const [isFastPassing, setIsFastPassing] = useState<boolean>(false);
 
   // 긴급상황 경광등 핀 선택 및 생성 로딩 상태
   const [internalSelectedAlert, setInternalSelectedAlert] = useState<EmergencyAlert | null>(null);
@@ -181,6 +189,12 @@ export const MapView: React.FC<MapViewProps> = ({
     const section = getNormalizedSection(ditch);
     const isTree = section === '식수';
 
+    // 장기 미점검 여부 판별 (14일 초과)
+    const overdueInfo = getDitchOverdueInfo(ditch, 14);
+    const overdueBadge = overdueInfo.isOverdue
+      ? `<span class="absolute -top-1.5 -left-1.5 w-4 h-4 bg-amber-500 border border-white text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow animate-pulse z-10" title="장기 미점검 (${overdueInfo.daysElapsed === 999 ? '미점검' : `${overdueInfo.daysElapsed}일 경과`})">⚠️</span>`
+      : '';
+
     // 배수로 명칭에서 번호(숫자) 추출 (예: '도로-1' -> '1', '본관-2' -> '2', '식수-3' -> '3')
     const match = ditch.name?.match(/\d+/);
     const ditchNumber = match ? match[0] : (ditch.name || '1');
@@ -200,6 +214,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       markerBody = `
         <div class="relative flex items-center justify-center">
+          ${overdueBadge}
           <svg width="42" height="44" viewBox="0 0 42 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="${selectionFilter}">
             <!-- 하얀 식수 외곽 테두리 (white tree silhouette) + 녹색면 (green surface) -->
             <path d="M 21 2
@@ -233,6 +248,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       markerBody = `
         <div class="relative flex items-center justify-center">
+          ${overdueBadge}
           <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''}">
             ${innerContent}
           </div>
@@ -367,9 +383,10 @@ export const MapView: React.FC<MapViewProps> = ({
 
     markersLayerRef.current.clearLayers();
 
-    // 선택된 구역 필터링 적용 (전체 / 도로 / 본관 / 별관 / 식수)
+    // 선택된 구역 필터링 적용 (전체 / 도로 / 본관 / 별관 / 식수 / 장기미점검)
     const filteredDitches = ditches.filter((ditch) => {
       if (selectedSection === 'ALL') return true;
+      if (selectedSection === 'OVERDUE') return getDitchOverdueInfo(ditch, 14).isOverdue;
       return getNormalizedSection(ditch) === selectedSection;
     });
 
@@ -691,6 +708,34 @@ export const MapView: React.FC<MapViewProps> = ({
               </button>
             );
           })}
+
+          {/* ⚠️ 장기 미점검 시설물 전용 필터 칩 */}
+          {(() => {
+            const overdueCount = ditches.filter((d) => getDitchOverdueInfo(d, 14).isOverdue).length;
+            if (overdueCount === 0) return null;
+            const isCurrent = selectedSection === 'OVERDUE';
+            return (
+              <button
+                type="button"
+                onClick={() => setSelectedSection(isCurrent ? 'ALL' : 'OVERDUE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
+                  isCurrent
+                    ? 'bg-amber-600 text-white border-amber-400 shadow-amber-950/80 ring-2 ring-amber-400/40'
+                    : 'bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 border-amber-600/70 backdrop-blur-md animate-pulse'
+                }`}
+                title="14일 이상 미점검 시설물만 필터링"
+              >
+                <span>⚠️ 장기미점검</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                    isCurrent ? 'bg-amber-800 text-amber-100' : 'bg-amber-900 text-amber-200'
+                  }`}
+                >
+                  {overdueCount}
+                </span>
+              </button>
+            );
+          })()}
         </div>
 
         {/* 카카오톡 브라우저 감지 시 안내 배너 */}
@@ -1120,52 +1165,128 @@ export const MapView: React.FC<MapViewProps> = ({
                 <span>•</span>
                 <span>최근 점검: {selectedDitch.lastInspectedAt || '미점검'}</span>
               </div>
+
+              {/* ⚠️ 장기 미점검 경고 배너 */}
+              {(() => {
+                const overdue = getDitchOverdueInfo(selectedDitch, 14);
+                if (!overdue.isOverdue) return null;
+                return (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-amber-950/60 border border-amber-500/80 flex items-start gap-2.5 text-xs text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-bounce" />
+                    <div className="flex-1">
+                      <div className="font-black text-amber-300 flex items-center justify-between">
+                        <span>장기 미점검 방치 경고</span>
+                        <span className="text-[10px] bg-amber-900 px-1.5 py-0.5 rounded text-amber-200 font-bold">
+                          {overdue.daysElapsed === 999 ? '점검 이력 없음' : `${overdue.daysElapsed}일 경과`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-amber-300/80 mt-0.5 leading-snug">
+                        정기 안전점검 주기(14일)를 초과하였습니다. 원활한 배수와 침수 예방을 위해 즉시 점검을 실시해 주십시오.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 액션 버튼 그룹 */}
             {userRole === 'INSPECTOR' ? (
-              // [주사님 모드]: 현장 점검 시작 (촬영은 점검 내부에서 수행)
+              // [주사님 모드]: 5초 패스트패스 & 상세점검
               <div className="space-y-2 pt-1">
-                <button
-                  onClick={() =>
-                    onOpenInspectionForm
-                      ? onOpenInspectionForm(selectedDitch)
-                      : onStartInspection(selectedDitch)
-                  }
-                  className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg rounded-xl flex items-center justify-center gap-2.5 shadow-xl shadow-blue-950/60 active:scale-95 transition-all"
-                >
-                  <CheckCircle2 className="w-6 h-6 text-blue-200" />
-                  현장 점검
-                </button>
-                <button
-                  onClick={() => onViewHistory(selectedDitch)}
-                  className="w-full h-11 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700"
-                >
-                  <History className="w-4 h-4 text-emerald-400" />
-                  과거 점검 이력 타임라인 조회
-                </button>
-              </div>
-            ) : (
-              // [관리자 모드]: 점검과 수정 (촬영칸 제거)
-              <div className="space-y-2 pt-1">
-                <div className="grid grid-cols-2 gap-2.5">
+                {onFastPassInspection && (
+                  <button
+                    type="button"
+                    disabled={isFastPassing}
+                    onClick={async () => {
+                      setIsFastPassing(true);
+                      try {
+                        await onFastPassInspection(selectedDitch);
+                        confetti({
+                          particleCount: 65,
+                          spread: 65,
+                          origin: { y: 0.8 },
+                        });
+                      } catch (err) {
+                        console.error('Fast pass error:', err);
+                        alert('점검 저장 중 문제가 발생했습니다.');
+                      } finally {
+                        setIsFastPassing(false);
+                      }
+                    }}
+                    className="w-full h-12 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 active:scale-95 transition-all"
+                  >
+                    <Zap className="w-5 h-5 text-slate-950 fill-current" />
+                    <span>{isFastPassing ? '저장 중...' : '⚡ 5초 패스트패스 (전부 정상 즉시 완료)'}</span>
+                  </button>
+                )}
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() =>
                       onOpenInspectionForm
                         ? onOpenInspectionForm(selectedDitch)
                         : onStartInspection(selectedDitch)
                     }
-                    className="h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-blue-950/50 active:scale-95 transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4 text-blue-200" />
-                    점검
+                    상세 점검 (사진/체크)
+                  </button>
+                  <button
+                    onClick={() => onViewHistory(selectedDitch)}
+                    className="h-11 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95"
+                  >
+                    <History className="w-4 h-4 text-emerald-400" />
+                    과거 점검 이력
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // [관리자 모드]: 5초 패스트패스 & 점검/수정
+              <div className="space-y-2 pt-1">
+                {onFastPassInspection && (
+                  <button
+                    type="button"
+                    disabled={isFastPassing}
+                    onClick={async () => {
+                      setIsFastPassing(true);
+                      try {
+                        await onFastPassInspection(selectedDitch);
+                        confetti({
+                          particleCount: 65,
+                          spread: 65,
+                          origin: { y: 0.8 },
+                        });
+                      } catch (err) {
+                        console.error('Fast pass error:', err);
+                        alert('점검 저장 중 문제가 발생했습니다.');
+                      } finally {
+                        setIsFastPassing(false);
+                      }
+                    }}
+                    className="w-full h-11 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 active:scale-95 transition-all"
+                  >
+                    <Zap className="w-4 h-4 text-slate-950 fill-current" />
+                    <span>{isFastPassing ? '저장 중...' : '⚡ 5초 패스트패스 (전부 정상 즉시 완료)'}</span>
+                  </button>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() =>
+                      onOpenInspectionForm
+                        ? onOpenInspectionForm(selectedDitch)
+                        : onStartInspection(selectedDitch)
+                    }
+                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-blue-200" />
+                    상세 점검
                   </button>
                   <button
                     onClick={() => onEditDitch(selectedDitch)}
-                    className="h-12 bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-sm rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95"
+                    className="h-11 bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95"
                   >
                     <Edit className="w-4 h-4" />
-                    수정
+                    정보 수정
                   </button>
                 </div>
                 <button

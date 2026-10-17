@@ -49,6 +49,17 @@ export function isFirebaseReady(): boolean {
   return !!appInstance && !!dbInstance;
 }
 
+// Firestore undefined 필드 방지 헬퍼
+function cleanForFirestore<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 // 1. 클라우드 Firestore에 배수로 정보 저장
 export async function syncDitchToCloud(ditch: DitchMaster): Promise<boolean> {
   try {
@@ -56,7 +67,8 @@ export async function syncDitchToCloud(ditch: DitchMaster): Promise<boolean> {
     if (!dbInstance) return false;
 
     const ref = doc(dbInstance, 'ditches', ditch.id);
-    await setDoc(ref, ditch, { merge: true });
+    const cleaned = cleanForFirestore(ditch);
+    await setDoc(ref, cleaned, { merge: true });
     console.log('✅ 배수로 클라우드 동기화 완료:', ditch.name);
     return true;
   } catch (err) {
@@ -110,11 +122,12 @@ export async function syncAlertToCloud(alert: EmergencyAlert): Promise<boolean> 
 
     const payload: EmergencyAlert = {
       ...alert,
-      photoUrl: optimizedPhoto,
+      photoUrl: optimizedPhoto || '',
     };
 
     const ref = doc(dbInstance, 'alerts', alert.id);
-    await setDoc(ref, payload, { merge: true });
+    const cleaned = cleanForFirestore(payload);
+    await setDoc(ref, cleaned, { merge: true });
     console.log('🚨 긴급상황 경광등 핀 클라우드 동기화 완료:', alert.id);
     return true;
   } catch (err) {
@@ -157,14 +170,15 @@ export async function syncInspectionToCloud(record: InspectionRecord): Promise<b
       optimizedPrevious = await compressBase64Image(optimizedPrevious, 640, 0.55);
     }
 
-    const payload: InspectionRecord = {
+    const payload: any = {
       ...record,
-      photoCurrentUrl: optimizedCurrent,
-      photoPreviousUrl: optimizedPrevious,
+      photoCurrentUrl: optimizedCurrent || '',
+      photoPreviousUrl: optimizedPrevious || '',
     };
 
     const ref = doc(dbInstance, 'inspections', record.id);
-    await setDoc(ref, payload, { merge: true });
+    const cleaned = cleanForFirestore(payload);
+    await setDoc(ref, cleaned, { merge: true });
     console.log('✅ 점검기록(사진 포함) 클라우드 동기화 완료:', record.id);
     return true;
   } catch (err) {

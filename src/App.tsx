@@ -8,7 +8,11 @@ import {
   Layers,
   Sparkles,
   Info,
+  Smartphone,
+  Download,
+  X,
 } from 'lucide-react';
+import { precacheFacilityMapTiles } from './services/mapTilePrecache';
 import { DitchMaster, InspectionRecord, UserSession, EmergencyAlert } from './types';
 import {
   getDitches,
@@ -43,6 +47,13 @@ import { DitchEditModal } from './components/DitchEditModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { RoleSelector } from './components/RoleSelector';
 import { FirebaseModal } from './components/FirebaseModal';
+import { OfflineSyncModal } from './components/OfflineSyncModal';
+import {
+  subscribeToSyncStatus,
+  getCurrentSyncStatus,
+  processOfflineSyncQueue,
+  SyncStatus,
+} from './services/offlineSync';
 
 export const App: React.FC = () => {
   // 1. 사용자 세션 및 권한 상태
@@ -70,6 +81,8 @@ export const App: React.FC = () => {
   const [isDitchEditOpen, setIsDitchEditOpen] = useState<boolean>(false);
   const [editingDitch, setEditingDitch] = useState<DitchMaster | null>(null);
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState<boolean>(false);
+  const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getCurrentSyncStatus());
 
   // 점검 진행 중 임시 사진 및 GPS
   const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string>('');
@@ -81,6 +94,11 @@ export const App: React.FC = () => {
     longitude: number;
     accuracy?: number;
   } | null>(null);
+
+  // 7. PWA 홈 화면 설치 프롬프트 상태
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(false);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(true);
 
   // 데이터 로드 함수
   const loadData = async () => {
@@ -142,8 +160,43 @@ export const App: React.FC = () => {
       }
     );
 
+    // 3. 오프라인 큐 및 네트워크 연결 상태 실시간 감지
+    const unsubSync = subscribeToSyncStatus((status) => {
+      setSyncStatus(status);
+    });
+
+    // 4. PWA 설치 가능 여부 및 설치 완료 감지
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsAppInstalled(true);
+    }
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsAppInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    // 5. 현장 지도 타일 백그라운드 자동 프리캐싱 (성남시 분당구 불정로 50 부지 52개 타일)
+    if (navigator.onLine) {
+      precacheFacilityMapTiles().then((res) => {
+        if (res.success) {
+          console.log(`🗺️ 현장 지도 오프라인 타일 프리캐싱 완료 (${res.downloaded}/${res.total})`);
+        }
+      }).catch((e) => console.warn('Tile auto-cache error:', e));
+    }
+
     return () => {
       if (unsubscribe) unsubscribe();
+      if (unsubSync) unsubSync();
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -380,6 +433,51 @@ export const App: React.FC = () => {
     return ditchInspections[0]?.photoCurrentUrl;
   };
 
+  // ⚡ 5초 패스트패스: 맵 바텀시트에서 즉시 전부 정상 점검 등록
+  const handleFastPassInspection = async (ditch: DitchMaster) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const formattedDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+      now.getDate()
+    )} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    const prevPhoto = getPreviousPhoto(ditch.id);
+
+    const fastRecord: InspectionRecord = {
+      id: `insp-${Date.now()}`,
+      ditchId: ditch.id,
+      inspectedAt: formattedDate,
+      inspectorName: session?.name || '현장 점검자',
+      sedimentStatus: '정상',
+      structureStatus: '정상',
+      urgencyLevel: '조치완료',
+      memo: '현장 순찰 점검: 통수 원활 및 구조물 상태 양호 (5초 패스트패스)',
+      photoCurrentUrl: prevPhoto || '',
+      photoPreviousUrl: prevPhoto,
+      gpsAccuracy: currentGps?.accuracy || 3.0,
+      latitude: ditch.latitude,
+      longitude: ditch.longitude,
+    };
+
+    await handleSaveInspection(fastRecord);
+  };
+
+  // PWA 홈 화면 앱 설치 트리거 (브라우저 주소창 없는 전체화면 앱화)
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) {
+      alert(
+        '이미 홈 화면에 앱으로 설치되어 있거나, 브라우저 메뉴(⋮)에서 [홈 화면에 추가] 또는 [앱 설치]를 선택해 주세요.'
+      );
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsAppInstalled(true);
+      setDeferredPrompt(null);
+    }
+  };
+
   const userRole = session?.role || 'INSPECTOR';
 
   return (
@@ -445,6 +543,49 @@ export const App: React.FC = () => {
 
         {/* 우측 사용자 권한 뱃지 & 설정 버튼 */}
         <div className="flex items-center gap-2">
+          {/* 오프라인 보장 & 대기 큐 동기화 상태 뱃지 버튼 */}
+          <button
+            onClick={() => setIsOfflineModalOpen(true)}
+            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+              !syncStatus.isOnline
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30 animate-pulse'
+                : syncStatus.pendingCount > 0
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+            }`}
+            title="오프라인 작동 및 동기화 상태 (클릭 시 상세 모달 및 즉시 동기화)"
+          >
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  !syncStatus.isOnline
+                    ? 'bg-rose-400'
+                    : syncStatus.pendingCount > 0
+                    ? 'bg-amber-400'
+                    : 'bg-emerald-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  !syncStatus.isOnline
+                    ? 'bg-rose-500'
+                    : syncStatus.pendingCount > 0
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-400'
+                }`}
+              />
+            </span>
+            <span className="font-bold text-xs">
+              {!syncStatus.isOnline
+                ? '오프라인'
+                : syncStatus.isSyncing
+                ? '동기화중...'
+                : syncStatus.pendingCount > 0
+                ? `대기 ${syncStatus.pendingCount}건`
+                : '로컬보장'}
+            </span>
+          </button>
+
           {/* Firebase 클라우드 실시간 동기화 상태 뱃지 & 설정 버튼 */}
           <button
             onClick={() => setIsFirebaseModalOpen(true)}
@@ -465,6 +606,18 @@ export const App: React.FC = () => {
               }`}
             />
           </button>
+
+          {/* PWA 앱 설치 버튼 (홈 화면 추가) */}
+          {!isAppInstalled && (
+            <button
+              onClick={handleInstallApp}
+              className="h-9 px-2 sm:px-2.5 rounded-xl text-xs font-black flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md active:scale-95 transition-all"
+              title="홈 화면에 전체화면 앱으로 설치"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-blue-200" />
+              <span className="hidden sm:inline">앱 설치</span>
+            </button>
+          )}
 
           {/* 역할 전환 버튼 */}
           <button
@@ -490,6 +643,32 @@ export const App: React.FC = () => {
         </div>
       </header>
 
+      {/* PWA 전체화면 앱 설치 안내 배너 */}
+      {!isAppInstalled && showInstallBanner && (
+        <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border-b border-blue-500/30 px-3 py-2 flex items-center justify-between text-xs text-blue-200 z-30 shadow-md">
+          <div className="flex items-center gap-2 truncate">
+            <Smartphone className="w-4 h-4 text-blue-400 shrink-0 animate-bounce" />
+            <span className="truncate">
+              <b>[배수로 지킴이]</b> 홈 화면에 설치하여 브라우저 주소창 없는 전체화면 앱으로 사용하세요!
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleInstallApp}
+              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[11px] shadow active:scale-95 transition-all"
+            >
+              홈 화면에 설치
+            </button>
+            <button
+              onClick={() => setShowInstallBanner(false)}
+              className="p-1 text-slate-400 hover:text-white rounded"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 2. 메인 컨텐츠 영역 */}
       <main className="flex-1 relative flex flex-col overflow-hidden">
         {isLoading ? (
@@ -508,6 +687,7 @@ export const App: React.FC = () => {
             }}
             onStartInspection={handleStartInspection}
             onOpenInspectionForm={handleOpenInspectionForm}
+            onFastPassInspection={handleFastPassInspection}
             onViewHistory={(ditch) => {
               setSelectedDitch(ditch);
               setIsHistoryOpen(true);
@@ -634,6 +814,18 @@ export const App: React.FC = () => {
           onConfigUpdated={loadData}
         />
       )}
+
+      {/* G. 오프라인 작동 보장 및 동기화 상태 모달 */}
+      <OfflineSyncModal
+        isOpen={isOfflineModalOpen}
+        onClose={() => setIsOfflineModalOpen(false)}
+        syncStatus={syncStatus}
+        onTriggerSync={async () => {
+          const res = await processOfflineSyncQueue();
+          await loadData();
+          return res;
+        }}
+      />
     </div>
   );
 };
