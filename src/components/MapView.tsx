@@ -18,8 +18,12 @@ import {
   ExternalLink,
   Siren,
   Trash2,
+  Maximize2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
+import { fileToBase64Compressed } from '../services/imageOptimizer';
+
 
 interface MapViewProps {
   ditches: DitchMaster[];
@@ -38,6 +42,7 @@ interface MapViewProps {
   alerts?: EmergencyAlert[];
   onCreateAlert?: (lat: number, lng: number, message?: string) => Promise<void> | void;
   onDeleteAlert?: (alertId: string) => Promise<void> | void;
+  onUpdateAlert?: (alert: EmergencyAlert) => Promise<void> | void;
   selectedAlert?: EmergencyAlert | null;
   onSelectAlert?: (alert: EmergencyAlert | null) => void;
 }
@@ -59,6 +64,7 @@ export const MapView: React.FC<MapViewProps> = ({
   alerts = [],
   onCreateAlert,
   onDeleteAlert,
+  onUpdateAlert,
   selectedAlert: externalSelectedAlert,
   onSelectAlert,
 }) => {
@@ -79,14 +85,67 @@ export const MapView: React.FC<MapViewProps> = ({
   };
   const [isCreatingAlert, setIsCreatingAlert] = useState<boolean>(false);
 
+  // 긴급상황 경광등 실시간 편집 상태 (바텀시트에서 직접 수정)
+  const [alertMessage, setAlertMessage] = useState<string>('');
+  const [alertPhotoUrl, setAlertPhotoUrl] = useState<string>('');
+  const [isSavingAlert, setIsSavingAlert] = useState<boolean>(false);
+  const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedAlert) {
+      setAlertMessage(selectedAlert.message || '🚨 현장 긴급상황 발생');
+      setAlertPhotoUrl(selectedAlert.photoUrl || '');
+    }
+  }, [selectedAlert?.id, selectedAlert?.message, selectedAlert?.photoUrl]);
+
+
+  // 이미지 파일 압축 최적화 유틸
+  const processImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 960;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.7);
+            resolve(compressed);
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // 지도 타일 종류: 기본값을 'streets'(일반지도)로 설정
   const [mapType, setMapType] = useState<'satellite' | 'streets'>('streets');
 
-  // 경기도 성남시 분당구 불정로 50 (분당노인종합복지관) 정확한 중심 좌표
-  const FACILITY_CENTER: [number, number] = [37.357602, 127.112510];
+  // 시설 기준 중심 좌표 (사용자 지정: 37.35836, 127.11149)
+  const FACILITY_CENTER: [number, number] = [37.35836, 127.11149];
   const FACILITY_BOUNDS = L.latLngBounds(
-    [37.3539, 127.1079], // 남서쪽 (SW: 남 400m, 서 400m)
-    [37.3611, 127.1169]  // 북동쪽 (NE: 북 400m, 동 400m)
+    [37.3557, 127.1081], // 남서쪽 (SW: 남 300m, 서 300m)
+    [37.3611, 127.1149]  // 북동쪽 (NE: 북 300m, 동 300m)
   );
 
   // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
@@ -226,14 +285,14 @@ export const MapView: React.FC<MapViewProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // 기본 좌표: 경기도 성남시 분당구 불정로 50
-    const initialLat = ditches[0]?.latitude || 37.357515;
-    const initialLng = ditches[0]?.longitude || 127.112388;
+    // 기본 좌표: 시설 기준 중심 좌표
+    const initialLat = ditches[0]?.latitude || FACILITY_CENTER[0];
+    const initialLng = ditches[0]?.longitude || FACILITY_CENTER[1];
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
       zoom: 18,
-      minZoom: 16, // 최소 축소 제한 (복지관 부지 반경 400m 조망)
+      minZoom: 16, // 최소 축소 제한 (복지관 부지 반경 300m 조망)
       maxZoom: 20, // 최대 확대 제한 (20레벨까지 확대 지원)
       maxBounds: FACILITY_BOUNDS, // 부지 밖 이동 차단 (투명 울타리)
       maxBoundsViscosity: 1.0, // 경계에 도달 시 단단하게 튕겨나옴
@@ -516,9 +575,13 @@ export const MapView: React.FC<MapViewProps> = ({
       locationMsg = '현재 지도 중심 위치';
     }
 
-    const confirmed = window.confirm(
-      `🚨 [긴급상황 위치 경광등 등록]\n\n${locationMsg}에 긴급상황 경광등 핀을 등록하시겠습니까?\n\n※ 등록 즉시 모든 사용자의 지도에 깜빡이는 빨간 경광등 핀이 실시간으로 표시됩니다.`
-    );
+    const alertCount = (alerts || []).length;
+    const alertPrompt =
+      alertCount > 0
+        ? `🚨 [긴급상황 위치 경광등 추가 등록]\n(현재 등록된 경광등: ${alertCount}건)\n\n${locationMsg}에 새로운 긴급상황 경광등 핀을 등록하시겠습니까?\n\n※ 등록 즉시 모든 사용자의 지도에 깜빡이는 빨간 경광등 핀이 실시간으로 표시됩니다.`
+        : `🚨 [긴급상황 위치 경광등 등록]\n\n${locationMsg}에 긴급상황 경광등 핀을 등록하시겠습니까?\n\n※ 등록 즉시 모든 사용자의 지도에 깜빡이는 빨간 경광등 핀이 실시간으로 표시됩니다.`;
+
+    const confirmed = window.confirm(alertPrompt);
 
     if (!confirmed) return;
 
@@ -677,11 +740,37 @@ export const MapView: React.FC<MapViewProps> = ({
           type="button"
           onClick={handleTriggerEmergencyAlert}
           disabled={isCreatingAlert}
-          className="w-12 h-12 bg-rose-950/90 hover:bg-rose-900 text-rose-400 hover:text-white rounded-xl shadow-2xl shadow-rose-950/80 flex items-center justify-center border-2 border-rose-500 active:scale-95 transition-all relative group"
-          title="현재 위치에 긴급상황 경광등 핀 등록"
+          className={`w-12 h-12 rounded-xl shadow-2xl flex items-center justify-center active:scale-95 transition-all relative group ${
+            alerts.length > 0
+              ? 'bg-rose-950/95 hover:bg-rose-900 text-white border-2 border-rose-500 shadow-rose-950/90 animate-pulse'
+              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 shadow-slate-950/80'
+          }`}
+          title={
+            alerts.length > 0
+              ? `긴급상황 경광등 ${alerts.length}건 발생 중 (클릭 시 현재 위치에 긴급상황 핀 등록)`
+              : '현재 위치에 긴급상황 경광등 핀 등록 (경고데이터 없음: 정지 중)'
+          }
         >
-          <Siren className="w-6 h-6 animate-pulse" />
-          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 animate-ping"></span>
+          {/* 경광등 아이콘: 경고데이터가 없으면 정지, 경고데이터가 있을 때만 동작 */}
+          <Siren
+            className={`w-6 h-6 transition-all ${
+              alerts.length > 0
+                ? 'text-rose-400 animate-bounce'
+                : 'text-slate-400 group-hover:text-rose-400'
+            }`}
+          />
+
+          {/* 경고데이터가 있을 때만 작동: 레이더 핑 애니메이션 */}
+          {alerts.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 animate-ping opacity-75 pointer-events-none" />
+          )}
+
+          {/* 1. 경고데이터가 있을 때만 모서리에 숫자로 개수 표시 */}
+          {alerts.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 border-2 border-white text-white text-[11px] font-black flex items-center justify-center leading-none z-10 shadow-lg shadow-rose-950 animate-bounce">
+              {alerts.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -720,38 +809,238 @@ export const MapView: React.FC<MapViewProps> = ({
               </button>
             </div>
 
-            {/* 내용 정보 */}
-            <div>
-              <h3 className="text-lg font-black text-rose-400 flex items-center gap-2">
-                <Siren className="w-5 h-5 shrink-0" />
-                <span>{selectedAlert.message || '현장 긴급상황 발생'}</span>
-              </h3>
-              <div className="text-xs text-slate-300 mt-2 space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">신고자(등록자):</span>
-                  <span className="text-white font-bold">{selectedAlert.creatorName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">등록 일시:</span>
-                  <span className="text-slate-200 font-semibold">{selectedAlert.createdFormatted}</span>
-                </div>
-                <div className="flex justify-between font-mono text-[11px]">
-                  <span className="text-slate-400 font-sans">발생 좌표:</span>
-                  <span className="text-slate-300">
-                    {selectedAlert.latitude.toFixed(6)}, {selectedAlert.longitude.toFixed(6)}
-                  </span>
-                </div>
+            {/* 🚨 긴급상황 내용 / 메모란 (붙임창에서 직접 편집) */}
+            <div className="space-y-1.5 pt-0.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Siren className="w-3.5 h-3.5 text-rose-400" />
+                  긴급상황 내용 / 메모
+                </span>
+                <span className="text-[10px] text-slate-400">클라우드 실시간 동기화</span>
+              </label>
+              <input
+                type="text"
+                value={alertMessage}
+                onChange={(e) => setAlertMessage(e.target.value)}
+                placeholder="긴급상황 내용 입력 (예: 배수로 범람 위험)"
+                className="w-full h-11 px-3.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-rose-500 shadow-inner"
+              />
+              {/* 빠른 추천 선택 칩 */}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {[
+                  '🚨 배수로 범람 위험',
+                  '⚠️ 덮개(그레이팅) 파손',
+                  '🍂 토사/낙엽으로 완전 막힘',
+                  '🛑 보행자 안전사고 위험',
+                  '🚧 배수관로 역류 발생',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setAlertMessage(preset)}
+                    className={`px-2 py-1 rounded-lg text-[10px] border active:scale-95 transition-all ${
+                      alertMessage === preset
+                        ? 'bg-rose-600 text-white border-rose-400 font-bold shadow'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* 하단 버튼 (닫기 & 해제/삭제) */}
-            <div className="flex items-center gap-2 pt-1">
+            {/* 현장 긴급 사진 등록/확대 */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-rose-400" />
+                  현장 긴급 사진
+                </span>
+                {alertPhotoUrl ? (
+                  <span className="text-[10px] text-emerald-400 font-bold">사진 등록됨</span>
+                ) : (
+                  <span className="text-[10px] text-slate-400">촬영 또는 사진 선택</span>
+                )}
+              </label>
+
+              {alertPhotoUrl ? (
+                <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
+                  <img
+                    src={alertPhotoUrl}
+                    alt="긴급상황 현장 사진"
+                    className="w-full h-36 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                    onClick={() => setEnlargedAlertPhoto(alertPhotoUrl)}
+                  />
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setEnlargedAlertPhoto(alertPhotoUrl)}
+                      className="px-2 py-1 bg-slate-900/80 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 border border-slate-700 active:scale-95 transition-all"
+                    >
+                      <Maximize2 className="w-3 h-3 text-blue-400" />
+                      크게보기
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <label className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-sm">
+                        <Camera className="w-3 h-3" />
+                        사진 변경
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const compressed = await fileToBase64Compressed(file);
+                              setAlertPhotoUrl(compressed);
+                              if (onUpdateAlert && selectedAlert) {
+                                await onUpdateAlert({
+                                  ...selectedAlert,
+                                  message: alertMessage.trim() || '🚨 현장 긴급상황 발생',
+                                  photoUrl: compressed,
+                                });
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert('사진 변환에 실패했습니다.');
+                            }
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setAlertPhotoUrl('');
+                          if (onUpdateAlert && selectedAlert) {
+                            await onUpdateAlert({
+                              ...selectedAlert,
+                              message: alertMessage.trim() || '🚨 현장 긴급상황 발생',
+                              photoUrl: '',
+                            });
+                          }
+                        }}
+                        className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all shadow-sm"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="h-12 border border-dashed border-rose-500/50 hover:border-rose-400 bg-rose-950/20 hover:bg-rose-950/40 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 text-rose-300">
+                    <Camera className="w-4 h-4 text-rose-400" />
+                    <span className="text-[11px] font-bold">📷 카메라 촬영</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const compressed = await fileToBase64Compressed(file);
+                          setAlertPhotoUrl(compressed);
+                          if (onUpdateAlert && selectedAlert) {
+                            await onUpdateAlert({
+                              ...selectedAlert,
+                              message: alertMessage.trim() || '🚨 현장 긴급상황 발생',
+                              photoUrl: compressed,
+                            });
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert('카메라 사진 처리에 실패했습니다.');
+                        }
+                      }}
+                    />
+                  </label>
+                  <label className="h-12 border border-dashed border-slate-700 hover:border-slate-500 bg-slate-950 hover:bg-slate-800 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 text-slate-300">
+                    <ImageIcon className="w-4 h-4 text-slate-400" />
+                    <span className="text-[11px] font-bold">🖼️ 갤러리/파일</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const compressed = await fileToBase64Compressed(file);
+                          setAlertPhotoUrl(compressed);
+                          if (onUpdateAlert && selectedAlert) {
+                            await onUpdateAlert({
+                              ...selectedAlert,
+                              message: alertMessage.trim() || '🚨 현장 긴급상황 발생',
+                              photoUrl: compressed,
+                            });
+                          }
+                        } catch (err) {
+                          console.error(err);
+                          alert('사진 불러오기에 실패했습니다.');
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* 등록 일시 & 발생 좌표 정보 */}
+            <div className="text-xs text-slate-300 space-y-1 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+              <div className="flex justify-between">
+                <span className="text-slate-400">등록 일시:</span>
+                <span className="text-slate-200 font-semibold">{selectedAlert.createdFormatted}</span>
+              </div>
+              <div className="flex justify-between font-mono text-[11px]">
+                <span className="text-slate-400 font-sans">발생 좌표:</span>
+                <span className="text-slate-300">
+                  {selectedAlert.latitude.toFixed(6)}, {selectedAlert.longitude.toFixed(6)}
+                </span>
+              </div>
+            </div>
+
+            {/* 하단 버튼 (닫기, 내용 저장, 해제/삭제) */}
+            <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
               <button
                 type="button"
                 onClick={() => setSelectedAlert(null)}
-                className="flex-1 h-12 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs active:scale-95 transition-all"
+                className="px-4 h-12 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs active:scale-95 transition-all shrink-0"
               >
                 닫기
+              </button>
+              <button
+                type="button"
+                disabled={isSavingAlert}
+                onClick={async () => {
+                  if (!selectedAlert) return;
+                  setIsSavingAlert(true);
+                  try {
+                    const updated: EmergencyAlert = {
+                      ...selectedAlert,
+                      message: alertMessage.trim() || '🚨 현장 긴급상황 발생',
+                      photoUrl: alertPhotoUrl || '',
+                    };
+                    if (onUpdateAlert) {
+                      await onUpdateAlert(updated);
+                    }
+                    setSelectedAlert(updated);
+                    alert('경광등 내용이 저장되었습니다.');
+                  } catch (err) {
+                    console.error('Failed to update alert:', err);
+                    alert('저장 중 오류가 발생했습니다.');
+                  } finally {
+                    setIsSavingAlert(false);
+                  }
+                }}
+                className="flex-1 h-12 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-blue-950/50 active:scale-95 transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {isSavingAlert ? '저장 중...' : '내용 저장'}
               </button>
               {onDeleteAlert && (
                 <button
@@ -766,13 +1055,14 @@ export const MapView: React.FC<MapViewProps> = ({
                       setSelectedAlert(null);
                     }
                   }}
-                  className="flex-1 h-12 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-rose-950/50 active:scale-95 transition-all"
+                  className="px-4 h-12 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-rose-950/50 active:scale-95 transition-all shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
-                  경광등 핀 해제 (삭제)
+                  해제(삭제)
                 </button>
               )}
             </div>
+
           </div>
         </div>
       )}
@@ -960,6 +1250,59 @@ export const MapView: React.FC<MapViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* 6. 긴급상황 현장 사진 원본 확대보기 모달 */}
+      {enlargedAlertPhoto && (
+
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+          onClick={() => setEnlargedAlertPhoto(null)}
+        >
+          <div
+            className="relative max-w-2xl w-full max-h-[92vh] flex flex-col items-center bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 상단 헤더 바 */}
+            <div className="w-full flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 text-white">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-md bg-rose-600 text-white flex items-center justify-center">
+                  <Siren className="w-4 h-4" />
+                </span>
+                <span className="font-black text-sm text-rose-300">🚨 긴급상황 현장 사진 확대보기</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnlargedAlertPhoto(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 원본 사진 영역 */}
+            <div className="w-full flex-1 overflow-auto p-2 bg-black flex items-center justify-center max-h-[75vh]">
+              <img
+                src={enlargedAlertPhoto}
+                alt="긴급상황 현장 사진 원본"
+                className="max-h-[72vh] w-auto max-w-full object-contain rounded-lg shadow-lg select-none"
+              />
+            </div>
+
+            {/* 하단 닫기 바 */}
+            <div className="w-full px-4 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">터치 시 확대 사진이 닫힙니다.</span>
+              <button
+                type="button"
+                onClick={() => setEnlargedAlertPhoto(null)}
+                className="px-4 h-10 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow active:scale-95 transition-all"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

@@ -323,7 +323,7 @@ export const App: React.FC = () => {
   };
 
   // 긴급상황 경광등 핀 생성
-  const handleCreateAlert = async (lat: number, lng: number, message?: string) => {
+  const handleCreateAlert = async (lat: number, lng: number, message?: string, photoUrl?: string) => {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const formatted = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -335,6 +335,7 @@ export const App: React.FC = () => {
       createdFormatted: formatted,
       creatorName: session?.name || '현장 점검자',
       message: message || '🚨 현장 긴급상황 발생',
+      photoUrl: photoUrl || '',
     };
     await saveAlert(newAlert);
     await loadData();
@@ -346,6 +347,15 @@ export const App: React.FC = () => {
     await loadData();
     if (selectedAlert?.id === alertId) {
       setSelectedAlert(null);
+    }
+  };
+
+  // 긴급상황 경광등 핀 정보 수정
+  const handleUpdateAlert = async (updatedAlert: EmergencyAlert) => {
+    await saveAlert(updatedAlert);
+    await loadData();
+    if (selectedAlert?.id === updatedAlert.id) {
+      setSelectedAlert(updatedAlert);
     }
   };
 
@@ -419,13 +429,16 @@ export const App: React.FC = () => {
             </button>
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all relative ${
                 currentView === 'dashboard'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" /> 총괄 대시보드
+              {alerts.length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" />
+              )}
             </button>
           </div>
         )}
@@ -514,6 +527,7 @@ export const App: React.FC = () => {
             alerts={alerts}
             onCreateAlert={handleCreateAlert}
             onDeleteAlert={handleDeleteAlert}
+            onUpdateAlert={handleUpdateAlert}
             selectedAlert={selectedAlert}
             onSelectAlert={(alert) => {
               setSelectedAlert(alert);
@@ -538,6 +552,7 @@ export const App: React.FC = () => {
             }}
             onDeleteDitch={handleDeleteDitch}
             onDeleteAlert={handleDeleteAlert}
+            onUpdateAlert={handleUpdateAlert}
           />
         )}
       </main>

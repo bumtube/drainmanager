@@ -240,10 +240,15 @@ export async function getAlerts(): Promise<EmergencyAlert[]> {
   }
 }
 
-// 5-4. 긴급상황 경광등 핀 저장
+// 5-4. 긴급상황 경광등 핀 저장 및 수정
 export async function saveAlert(alert: EmergencyAlert): Promise<void> {
   const alerts = await getAlerts();
-  alerts.unshift(alert);
+  const existingIndex = alerts.findIndex((a) => a.id === alert.id);
+  if (existingIndex >= 0) {
+    alerts[existingIndex] = alert;
+  } else {
+    alerts.unshift(alert);
+  }
   await set(ALERTS_KEY, alerts);
 
   // 클라우드 Firestore 실시간 동기화

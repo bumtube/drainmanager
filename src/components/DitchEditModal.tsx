@@ -69,9 +69,9 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
   // 4. 특이사항
   const [memo, setMemo] = useState(ditch?.memo || '');
 
-  // 5. GPS 좌표 (분당구 불정로 50 기본값)
-  const defaultLat = currentGps ? currentGps.latitude : 37.357515;
-  const defaultLng = currentGps ? currentGps.longitude : 127.112388;
+  // 5. GPS 좌표 (기준 기본값)
+  const defaultLat = currentGps ? currentGps.latitude : 37.35836;
+  const defaultLng = currentGps ? currentGps.longitude : 127.11149;
 
   const [latitude, setLatitude] = useState<number>(ditch ? ditch.latitude : defaultLat);
   const [longitude, setLongitude] = useState<number>(ditch ? ditch.longitude : defaultLng);

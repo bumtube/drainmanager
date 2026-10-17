@@ -103,8 +103,18 @@ export async function syncAlertToCloud(alert: EmergencyAlert): Promise<boolean> 
     if (!dbInstance) initFirebase();
     if (!dbInstance) return false;
 
+    let optimizedPhoto = alert.photoUrl;
+    if (optimizedPhoto && optimizedPhoto.startsWith('data:image')) {
+      optimizedPhoto = await compressBase64Image(optimizedPhoto, 960, 0.65);
+    }
+
+    const payload: EmergencyAlert = {
+      ...alert,
+      photoUrl: optimizedPhoto,
+    };
+
     const ref = doc(dbInstance, 'alerts', alert.id);
-    await setDoc(ref, alert, { merge: true });
+    await setDoc(ref, payload, { merge: true });
     console.log('🚨 긴급상황 경광등 핀 클라우드 동기화 완료:', alert.id);
     return true;
   } catch (err) {

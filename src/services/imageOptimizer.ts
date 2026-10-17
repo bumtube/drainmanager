@@ -74,3 +74,32 @@ export async function compressBase64Image(
     }
   });
 }
+
+/**
+ * 업로드된 File 객체를 읽어 가로/세로 960px 이하 및 JPEG 0.65 품질로 압축 변환
+ */
+export function fileToBase64Compressed(
+  file: File,
+  maxDimension: number = 960,
+  quality: number = 0.65
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const rawBase64 = e.target?.result as string;
+      if (!rawBase64) {
+        resolve('');
+        return;
+      }
+      try {
+        const compressed = await compressBase64Image(rawBase64, maxDimension, quality);
+        resolve(compressed);
+      } catch {
+        resolve(rawBase64);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+

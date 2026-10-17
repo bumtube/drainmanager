@@ -22,11 +22,17 @@ import {
   ClipboardList,
   Clock,
   ExternalLink,
+  X,
+  Camera,
+  Maximize2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { DitchMaster, InspectionRecord, DrainStatus, EmergencyAlert } from '../types';
 import { exportDitchesAndInspectionsToExcel } from '../services/excelExport';
 import { exportAllDataJson, importAllDataJson, resetToDefaultData } from '../services/storage';
+import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { PrintReportModal } from './PrintReportModal';
+
 
 export type SortField = 'code' | 'name' | 'section' | 'currentStatus' | 'lastInspectedAt';
 export type SortDirection = 'asc' | 'desc';
@@ -42,6 +48,7 @@ interface AdminDashboardProps {
   onOpenEdit?: (ditch: DitchMaster) => void;
   onDeleteDitch?: (ditchId: string) => Promise<void>;
   onDeleteAlert?: (alertId: string) => Promise<void>;
+  onUpdateAlert?: (alert: EmergencyAlert) => Promise<void> | void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -55,6 +62,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenEdit,
   onDeleteDitch,
   onDeleteAlert,
+  onUpdateAlert,
 }) => {
   // 필터 상태
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +79,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     ditch: DitchMaster;
     inspection: InspectionRecord;
   } | null>(null);
+
+  // 경광등 데이터 수정 모달 상태
+  const [editingAlertTarget, setEditingAlertTarget] = useState<EmergencyAlert | null>(null);
+  const [editAlertMessage, setEditAlertMessage] = useState<string>('');
+  const [editAlertPhotoUrl, setEditAlertPhotoUrl] = useState<string>('');
+  const [isSavingAlert, setIsSavingAlert] = useState<boolean>(false);
+  const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
+
+
 
   // 구역 목록 ('주차장' -> '도로' 변환 반영)
   const sections = Array.from(
@@ -264,8 +281,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // 긴급상황 경광등 해제 확인 핸들러
   const handleDeleteAlertConfirm = async (targetAlert: EmergencyAlert) => {
     const confirmed = window.confirm(
-      `🚨 [긴급상황 경광등 해제/삭제]\n\n신고자: ${targetAlert.creatorName}\n등록일시: ${targetAlert.createdFormatted}\n내용: ${targetAlert.message || '긴급상황 발생'}\n\n이 긴급상황 경광등을 해제(삭제)하시겠습니까?\n\n※ 상황 종료 시 모든 사용자의 지도 및 화면에서 즉시 제거됩니다.`
+      `🚨 [긴급상황 경광등 해제/삭제]\n\n등록일시: ${targetAlert.createdFormatted}\n내용: ${targetAlert.message || '긴급상황 발생'}\n\n이 긴급상황 경광등을 해제(삭제)하시겠습니까?\n\n※ 상황 종료 시 모든 사용자의 지도 및 화면에서 즉시 제거됩니다.`
     );
+
     if (confirmed && onDeleteAlert) {
       try {
         await onDeleteAlert(targetAlert.id);
@@ -395,11 +413,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <h4 className="text-sm font-black text-rose-300 mt-2.5 flex items-center gap-1.5">
                     {alert.message || '🚨 현장 긴급상황 발생'}
                   </h4>
-                  <div className="text-xs text-slate-300 mt-2 space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">신고자(등록자):</span>
-                      <span className="text-white font-bold">{alert.creatorName || '현장 점검자'}</span>
+
+                  {/* 현장 사진 썸네일 (등록된 경우) */}
+                  {alert.photoUrl ? (
+                    <div className="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 mt-2.5 group">
+                      <img
+                        src={alert.photoUrl}
+                        alt="긴급상황 현장 사진"
+                        className="w-full h-28 object-cover cursor-pointer hover:opacity-95 transition-all"
+                        onClick={() => setEnlargedAlertPhoto(alert.photoUrl!)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEnlargedAlertPhoto(alert.photoUrl!)}
+                        className="absolute bottom-1.5 right-1.5 px-2 py-0.5 bg-slate-900/85 hover:bg-slate-900 text-white text-[10px] font-bold rounded backdrop-blur-sm border border-slate-700 flex items-center gap-1 shadow active:scale-95 transition-all"
+                      >
+                        <Maximize2 className="w-3 h-3 text-blue-400" />
+                        사진 확대
+                      </button>
+                      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-rose-600/90 text-white text-[9px] font-bold rounded flex items-center gap-1 shadow">
+                        <Camera className="w-2.5 h-2.5" />
+                        현장 사진
+                      </div>
                     </div>
+                  ) : (
+                    <div className="mt-2 py-1 px-2.5 rounded-lg bg-slate-950/40 border border-slate-800 text-[10px] text-slate-500 flex items-center gap-1.5">
+                      <ImageIcon className="w-3 h-3 text-slate-600" />
+                      <span>등록된 현장 사진 없음</span>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-slate-300 mt-2 space-y-1 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
                     <div className="flex justify-between font-mono text-[11px]">
                       <span className="text-slate-400 font-sans">발생 좌표:</span>
                       <span className="text-slate-300">
@@ -418,6 +462,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <MapPin className="w-3.5 h-3.5 text-rose-400" />
                     지도에서 보기
                   </button>
+                  {onUpdateAlert && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAlertTarget(alert);
+                        setEditAlertMessage(alert.message || '🚨 현장 긴급상황 발생');
+                        setEditAlertPhotoUrl(alert.photoUrl || '');
+                      }}
+                      className="h-9 px-3 bg-slate-800 hover:bg-blue-600 hover:text-white text-blue-300 border border-slate-700 font-bold text-xs rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all"
+                      title="경광등 내용 및 사진 수정"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      수정
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => handleDeleteAlertConfirm(alert)}
@@ -799,6 +858,273 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           onClose={() => setActivePrintTarget(null)}
         />
       )}
+
+      {/* 경광등 데이터 수정 모달 */}
+      {editingAlertTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 text-white shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Siren className="w-5 h-5 text-rose-400" />
+                <h3 className="font-black text-base">경광등 긴급상황 데이터 수정</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAlertTarget(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  🚨 긴급상황 내용 / 메시지
+                </label>
+                <input
+                  type="text"
+                  value={editAlertMessage}
+                  onChange={(e) => setEditAlertMessage(e.target.value)}
+                  placeholder="긴급상황 내용 입력 (예: 배수로 범람 위험)"
+                  className="w-full h-11 px-3.5 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-rose-500"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1.5">
+                  {[
+                    '🚨 배수로 범람 위험',
+                    '⚠️ 덮개(그레이팅) 파손',
+                    '🍂 토사/낙엽으로 완전 막힘',
+                    '🛑 보행자 안전사고 위험',
+                    '🚧 배수관로 역류 발생',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditAlertMessage(preset)}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded-lg text-[10px] border border-slate-700 active:scale-95 transition-all"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 긴급상황 현장 사진 등록/수정 */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-rose-400" />
+                    현장 긴급 사진 등록/수정
+                  </span>
+                  {editAlertPhotoUrl && (
+                    <span className="text-[10px] text-emerald-400 font-bold">사진 등록됨</span>
+                  )}
+                </label>
+
+                {editAlertPhotoUrl ? (
+                  <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
+                    <img
+                      src={editAlertPhotoUrl}
+                      alt="현장 사진 미리보기"
+                      className="w-full h-36 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() => setEnlargedAlertPhoto(editAlertPhotoUrl)}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/85 via-black/50 to-transparent flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setEnlargedAlertPhoto(editAlertPhotoUrl)}
+                        className="px-2 py-1 bg-slate-900/80 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 border border-slate-700 active:scale-95 transition-all"
+                      >
+                        <Maximize2 className="w-3 h-3 text-blue-400" />
+                        크게보기
+                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <label className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-sm">
+                          <Camera className="w-3 h-3" />
+                          사진 변경
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                const compressed = await fileToBase64Compressed(file);
+                                setEditAlertPhotoUrl(compressed);
+                              } catch (err) {
+                                console.error(err);
+                                alert('사진 변환에 실패했습니다.');
+                              }
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setEditAlertPhotoUrl('')}
+                          className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all shadow-sm"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="h-12 border border-dashed border-rose-500/50 hover:border-rose-400 bg-rose-950/20 hover:bg-rose-950/40 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 text-rose-300">
+                      <Camera className="w-4 h-4 text-rose-400" />
+                      <span className="text-xs font-bold">카메라 촬영</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const compressed = await fileToBase64Compressed(file);
+                            setEditAlertPhotoUrl(compressed);
+                          } catch (err) {
+                            console.error(err);
+                            alert('카메라 사진 처리에 실패했습니다.');
+                          }
+                        }}
+                      />
+                    </label>
+                    <label className="h-12 border border-dashed border-slate-700 hover:border-slate-500 bg-slate-950 hover:bg-slate-800 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 text-slate-300">
+                      <ImageIcon className="w-4 h-4 text-slate-400" />
+                      <span className="text-xs font-bold">갤러리/파일</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const compressed = await fileToBase64Compressed(file);
+                            setEditAlertPhotoUrl(compressed);
+                          } catch (err) {
+                            console.error(err);
+                            alert('사진 불러오기에 실패했습니다.');
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1 text-slate-400">
+                <div className="flex justify-between">
+                  <span>등록 일시:</span>
+                  <span className="text-slate-300">{editingAlertTarget.createdFormatted}</span>
+                </div>
+                <div className="flex justify-between font-mono">
+                  <span>발생 좌표:</span>
+                  <span className="text-slate-300">
+                    {editingAlertTarget.latitude.toFixed(6)}, {editingAlertTarget.longitude.toFixed(6)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setEditingAlertTarget(null)}
+                disabled={isSavingAlert}
+                className="flex-1 h-11 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={isSavingAlert}
+                onClick={async () => {
+                  if (!editingAlertTarget) return;
+                  setIsSavingAlert(true);
+                  try {
+                    const updated: EmergencyAlert = {
+                      ...editingAlertTarget,
+                      message: editAlertMessage.trim() || '🚨 현장 긴급상황 발생',
+                      photoUrl: editAlertPhotoUrl || '',
+                    };
+
+                    if (onUpdateAlert) {
+                      await onUpdateAlert(updated);
+                    }
+                    setEditingAlertTarget(null);
+                  } catch (err) {
+                    console.error('Failed to update alert:', err);
+                    window.alert('경광등 수정 중 오류가 발생했습니다.');
+                  } finally {
+                    setIsSavingAlert(false);
+                  }
+                }}
+                className="flex-1 h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                수정 완료 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. 긴급상황 현장 사진 원본 확대보기 모달 */}
+      {enlargedAlertPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200"
+          onClick={() => setEnlargedAlertPhoto(null)}
+        >
+          <div
+            className="relative max-w-2xl w-full max-h-[92vh] flex flex-col items-center bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 상단 헤더 바 */}
+            <div className="w-full flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800 text-white">
+              <div className="flex items-center gap-2">
+                <span className="p-1 rounded-md bg-rose-600 text-white flex items-center justify-center">
+                  <Siren className="w-4 h-4" />
+                </span>
+                <span className="font-black text-sm text-rose-300">🚨 긴급상황 현장 사진 확대보기</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnlargedAlertPhoto(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl bg-slate-800 hover:bg-slate-700 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 원본 사진 영역 */}
+            <div className="w-full flex-1 overflow-auto p-2 bg-black flex items-center justify-center max-h-[75vh]">
+              <img
+                src={enlargedAlertPhoto}
+                alt="긴급상황 현장 사진 원본"
+                className="max-h-[72vh] w-auto max-w-full object-contain rounded-lg shadow-lg select-none"
+              />
+            </div>
+
+            {/* 하단 닫기 바 */}
+            <div className="w-full px-4 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">터치 시 확대 사진이 닫힙니다.</span>
+              <button
+                type="button"
+                onClick={() => setEnlargedAlertPhoto(null)}
+                className="px-4 h-10 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow active:scale-95 transition-all"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

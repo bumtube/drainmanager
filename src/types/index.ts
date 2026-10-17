@@ -59,5 +59,6 @@ export interface EmergencyAlert {
   createdFormatted: string; // 표시용 일시 (예: 2026-10-16 00:05)
   creatorName: string; // 등록자 이름 (예: 김철수 주사님)
   message: string; // 상황 설명 (예: 긴급 지원 필요)
+  photoUrl?: string; // 긴급상황 현장 사진 (Base64 or URL)
 }
 
