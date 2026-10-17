@@ -105,7 +105,7 @@ firebase deploy --only hosting`;
           {activeTab === 'config' ? (
             <div className="space-y-4">
               <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl text-xs text-amber-200">
-                💡 키를 입력하지 않아도 모든 기능(지도, 고스트 카메라, 엑셀/PDF, 점검기록)은
+                💡 키를 입력하지 않아도 모든 기능(지도, 현장 카메라 점검, 엑셀/PDF, 점검기록)은
                 브라우저 내부 IndexedDB를 통해 100% 정상 작동합니다. 클라우드 실시간 동기화가
                 필요할 때 아래 값을 입력하세요.
               </div>

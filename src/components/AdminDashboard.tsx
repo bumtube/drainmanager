@@ -94,16 +94,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState<boolean>(false);
 
-  // 구역 목록 ('주차장'/'도로' -> '정자 앞' 변환 반영)
-  const sections = Array.from(
-    new Set(ditches.map((d) => (d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section || '정자 앞')))
-  );
+  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '식수' 감지)
+  const getNormalizedDitchSection = (d: DitchMaster): string => {
+    const s = d.section || '';
+    const n = d.name || '';
+    if (s === '식수' || n.includes('식수')) return '식수';
+    if (s === '본관' || n.includes('본관')) return '본관';
+    if (s === '별관' || n.includes('별관')) return '별관';
+    if (
+      s === '정자 앞' ||
+      s === '도로' ||
+      s === '주차장' ||
+      n.includes('정자 앞') ||
+      n.includes('도로') ||
+      n.includes('주차장')
+    ) {
+      return '정자 앞';
+    }
+    return s || '정자 앞';
+  };
+
+  // 표준 구역 목록
+  const sections = ['정자 앞', '본관', '별관', '식수'];
 
   // FMS 표준 구역별 요약 지표 (정자 앞, 본관, 별관, 식수)
   const sectionSummaryList = useMemo(() => {
     const list = ['정자 앞', '본관', '별관', '식수'];
     return list.map((sec) => {
-      const secDitches = ditches.filter((d) => (d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section || '정자 앞') === sec);
+      const secDitches = ditches.filter((d) => getNormalizedDitchSection(d) === sec);
       const total = secDitches.length;
       const goodCount = secDitches.filter((d) => d.currentStatus === 'GOOD').length;
       const issueCount = secDitches.filter((d) => d.currentStatus === 'WARNING' || d.currentStatus === 'DANGER').length;
@@ -118,6 +136,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   }, [ditches]);
 
+  // 구역별 탭 구분 목록 및 건수 (전체 배수로, 정자 앞, 본관, 별관, 식수)
+  const sectionTabs = useMemo(() => {
+    const counts: Record<string, { total: number; issueCount: number }> = {
+      ALL: {
+        total: ditches.length,
+        issueCount: ditches.filter((d) => d.currentStatus === 'WARNING' || d.currentStatus === 'DANGER').length,
+      },
+      '정자 앞': { total: 0, issueCount: 0 },
+      '본관': { total: 0, issueCount: 0 },
+      '별관': { total: 0, issueCount: 0 },
+      '식수': { total: 0, issueCount: 0 },
+    };
+
+    ditches.forEach((d) => {
+      const sec = getNormalizedDitchSection(d);
+      if (counts[sec]) {
+        counts[sec].total += 1;
+        if (d.currentStatus === 'WARNING' || d.currentStatus === 'DANGER') {
+          counts[sec].issueCount += 1;
+        }
+      }
+    });
+
+    return [
+      { key: 'ALL', label: '전체 배수로', count: counts['ALL'].total, issueCount: counts['ALL'].issueCount },
+      { key: '정자 앞', label: '정자 앞', count: counts['정자 앞'].total, issueCount: counts['정자 앞'].issueCount },
+      { key: '본관', label: '본관', count: counts['본관'].total, issueCount: counts['본관'].issueCount },
+      { key: '별관', label: '별관', count: counts['별관'].total, issueCount: counts['별관'].issueCount },
+      { key: '식수', label: '🌲 식수', count: counts['식수'].total, issueCount: counts['식수'].issueCount },
+    ];
+  }, [ditches]);
+
   // 필터링된 배수로 목록
   const filteredDitches = ditches.filter((d) => {
     const matchSearch =
@@ -126,7 +176,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       (d.address && d.address.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchStatus = statusFilter === 'ALL' || d.currentStatus === statusFilter;
-    const currentSection = d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section;
+    const currentSection = getNormalizedDitchSection(d);
     const matchSection = sectionFilter === 'ALL' || currentSection === sectionFilter;
     const matchEmergency = !onlyEmergency || d.currentStatus === 'DANGER';
     const matchOverdue = !onlyOverdue || getDitchOverdueInfo(d, 14).isOverdue;
@@ -206,8 +256,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       // 5. 공구/구역
       if (sortField === 'section') {
-        const secA = a.section === '주차장' || a.section === '도로' ? '정자 앞' : a.section || '';
-        const secB = b.section === '주차장' || b.section === '도로' ? '정자 앞' : b.section || '';
+        const secA = getNormalizedDitchSection(a);
+        const secB = getNormalizedDitchSection(b);
         const comp = secA.localeCompare(secB, 'ko');
         return sortDirection === 'asc' ? comp : -comp;
       }
@@ -674,8 +724,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* 4. 데이터 표 (Table) */}
+      {/* 4. 데이터 표 (Table) & 구역별 탭 구분 */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
+        {/* 구역별 구분 탭: 전체배수로목록, 정자 앞, 본관, 별관, 식수 */}
+        <div className="p-3 sm:p-4 bg-slate-950 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+            <span className="text-xs font-black text-slate-300 flex items-center gap-1.5 shrink-0 mr-1">
+              <Layers className="w-4 h-4 text-blue-400" />
+              배수로 구역별 구분:
+            </span>
+            {sectionTabs.map((tab) => {
+              const isSelected = sectionFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setSectionFilter(tab.key)}
+                  className={`h-9 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-950 font-black'
+                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[11px] font-mono font-bold ${
+                      isSelected
+                        ? 'bg-blue-800 text-blue-100'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                  {tab.issueCount > 0 && (
+                    <span
+                      className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"
+                      title={`주의/이상 ${tab.issueCount}건`}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-400 shrink-0 self-end md:self-auto font-medium">
+            <span>현재 조회:</span>
+            <span className="text-white font-bold font-mono">
+              {sectionFilter === 'ALL' ? '전체 배수로 목록' : `${sectionFilter} 구역`} ({sortedDitches.length}개소)
+            </span>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider select-none">
@@ -811,7 +910,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-300 hidden md:table-cell">
-                        {ditch.section === '주차장' || ditch.section === '도로' ? '정자 앞' : ditch.section}
+                        {getNormalizedDitchSection(ditch)}
                       </td>
                       <td className="py-3 px-4 text-slate-400 font-mono text-xs hidden lg:table-cell">
                         {ditch.dimension}

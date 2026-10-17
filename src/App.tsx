@@ -40,7 +40,6 @@ import {
   fetchInspectionsFromCloud,
 } from './services/firebase';
 import { MapView } from './components/MapView';
-import { GhostCamera } from './components/GhostCamera';
 import { QuickInspectionForm } from './components/QuickInspectionForm';
 import { InspectionHistoryModal } from './components/InspectionHistoryModal';
 import { DitchEditModal } from './components/DitchEditModal';
@@ -75,7 +74,6 @@ export const App: React.FC = () => {
   const [selectedAlert, setSelectedAlert] = useState<EmergencyAlert | null>(null);
 
   // 5. 모달 및 플로우 상태
-  const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
   const [isQuickFormOpen, setIsQuickFormOpen] = useState<boolean>(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [isDitchEditOpen, setIsDitchEditOpen] = useState<boolean>(false);
@@ -308,24 +306,17 @@ export const App: React.FC = () => {
     }
   };
 
-  // 촬영 시작 버튼 클릭 -> 고스트 카메라 열기
+  // 현장 점검 시작 버튼 클릭 -> 원터치 점검 폼 바로 열기
   const handleStartInspection = (ditch: DitchMaster) => {
     setSelectedDitch(ditch);
-    setIsCameraOpen(true);
+    setCapturedPhotoUrl('');
+    setIsQuickFormOpen(true);
   };
 
   // 현장 점검 폼 바로 열기 (체크리스트 작성)
   const handleOpenInspectionForm = (ditch: DitchMaster) => {
     setSelectedDitch(ditch);
     setCapturedPhotoUrl('');
-    setIsQuickFormOpen(true);
-  };
-
-  // 고스트 카메라 촬영 완료 -> 원터치 점검 폼으로 전달
-  const handlePhotoCaptured = (photoBase64: string, gpsAccuracy?: number) => {
-    setCapturedPhotoUrl(photoBase64);
-    setCapturedGpsAccuracy(gpsAccuracy);
-    setIsCameraOpen(false);
     setIsQuickFormOpen(true);
   };
 
@@ -493,7 +484,6 @@ export const App: React.FC = () => {
             setSelectedAlert(null);
             setIsQuickFormOpen(false);
             setIsHistoryOpen(false);
-            setIsCameraOpen(false);
             setIsDitchEditOpen(false);
           }}
           className="flex items-center gap-2 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-left focus:outline-none"
@@ -739,31 +729,16 @@ export const App: React.FC = () => {
 
       {/* 3. 모달 컴포넌트 렌더링 */}
 
-      {/* A. 고스트 카메라 화면 */}
-      {isCameraOpen && selectedDitch && (
-        <GhostCamera
-          ditch={selectedDitch}
-          previousPhotoUrl={getPreviousPhoto(selectedDitch.id)}
-          inspectorName={session?.name || '현장 점검자'}
-          currentGps={currentGps}
-          onPhotoCaptured={handlePhotoCaptured}
-          onCancel={() => setIsCameraOpen(false)}
-        />
-      )}
-
-      {/* B. 원터치 점검 폼 화면 */}
+      {/* 원터치 현장 점검 폼 화면 */}
       {isQuickFormOpen && selectedDitch && (
         <QuickInspectionForm
           ditch={selectedDitch}
           inspectorName={session?.name || '현장 점검자'}
           capturedPhotoUrl={capturedPhotoUrl}
           previousPhotoUrl={getPreviousPhoto(selectedDitch.id)}
-          gpsAccuracy={capturedGpsAccuracy}
+          gpsAccuracy={capturedGpsAccuracy || currentGps?.accuracy}
+          currentGps={currentGps}
           onSave={handleSaveInspection}
-          onRetakePhoto={() => {
-            setIsQuickFormOpen(false);
-            setIsCameraOpen(true);
-          }}
           onRemovePhoto={() => setCapturedPhotoUrl('')}
           onCancel={() => {
             setIsQuickFormOpen(false);

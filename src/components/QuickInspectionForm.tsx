@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Mic,
   MicOff,
@@ -10,6 +10,8 @@ import {
   Camera,
   Layers,
   Sparkles,
+  Image as ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
@@ -24,11 +26,12 @@ import { BeforeAfterSliderModal } from './BeforeAfterSliderModal';
 interface QuickInspectionFormProps {
   ditch: DitchMaster;
   inspectorName: string;
-  capturedPhotoUrl: string;
+  capturedPhotoUrl?: string;
   previousPhotoUrl?: string;
   gpsAccuracy?: number;
+  currentGps?: { latitude: number; longitude: number; accuracy?: number } | null;
   onSave: (record: InspectionRecord) => Promise<void>;
-  onRetakePhoto: () => void;
+  onRetakePhoto?: () => void;
   onRemovePhoto?: () => void;
   onCancel: () => void;
 }
@@ -36,9 +39,10 @@ interface QuickInspectionFormProps {
 export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
   ditch,
   inspectorName,
-  capturedPhotoUrl,
+  capturedPhotoUrl = '',
   previousPhotoUrl,
   gpsAccuracy,
+  currentGps,
   onSave,
   onRetakePhoto,
   onRemovePhoto,
@@ -49,6 +53,18 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
   const [structureStatus, setStructureStatus] = useState<StructureStatus>('정상');
   const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('조치완료');
   const [memo, setMemo] = useState<string>('');
+
+  // 현장 사진 상태 및 파일 인풋 Ref (네이티브 카메라/앨범)
+  const [photoUrl, setPhotoUrl] = useState<string>(capturedPhotoUrl || '');
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState<boolean>(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (capturedPhotoUrl) {
+      setPhotoUrl(capturedPhotoUrl);
+    }
+  }, [capturedPhotoUrl]);
 
   // 비포/애프터 비교 모달
   const [showSliderModal, setShowSliderModal] = useState<boolean>(false);
@@ -113,6 +129,111 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
     }
   };
 
+  // 현장 사진 파일 처리 및 표준 워터마크 자동 각인
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingPhoto(true);
+    try {
+      // 1. 이미지 로드
+      const reader = new FileReader();
+      const rawDataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = rawDataUrl;
+      });
+
+      // 2. 가로/세로 최적화 리사이징 (최대 960px, Firestore 1MB 제한 대비 80~120KB 압축)
+      const MAX_DIM = 960;
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > MAX_DIM) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        }
+      } else {
+        if (height > MAX_DIM) {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(width, 1);
+      canvas.height = Math.max(height, 1);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context not available');
+
+      // 3. 원본 이미지 리사이징 그리기
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // 4. 워터마크 정보 구성 (일시, 점검자, GPS 좌표)
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const formattedDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+        now.getDate()
+      )} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+      const lat = currentGps?.latitude ? currentGps.latitude.toFixed(6) : ditch.latitude.toFixed(6);
+      const lng = currentGps?.longitude ? currentGps.longitude.toFixed(6) : ditch.longitude.toFixed(6);
+      const acc = currentGps?.accuracy ? ` (오차: ${currentGps.accuracy.toFixed(1)}m)` : '';
+
+      const safeCode = ditch.code.replace(/(주차장|도로)/g, '정자 앞');
+      const safeName = ditch.name.replace(/(주차장|도로)/g, '정자 앞');
+      const line1 = `[배수로 현장점검] ${safeCode} | ${safeName}`;
+      const line2 = `일시: ${formattedDate} | 점검자: ${inspectorName}`;
+      const line3 = `위치: N ${lat}, E ${lng}${acc}`;
+
+      // 5. 하단 워터마크 박스 (하단 배경 반투명 블랙 + 에메랄드 포인트 라인)
+      const boxHeight = Math.max(75, Math.floor(height * 0.14));
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.80)';
+      ctx.fillRect(0, height - boxHeight, width, boxHeight);
+
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(0, height - boxHeight, width, 4);
+
+      // 6. 텍스트 각인
+      const fontSize = Math.max(14, Math.floor(width * 0.024));
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${fontSize}px "Pretendard", -apple-system, sans-serif`;
+      ctx.textBaseline = 'middle';
+
+      const paddingX = 16;
+      const startY = height - boxHeight + 18;
+      const lineHeight = (boxHeight - 28) / 2;
+
+      ctx.fillText(line1, paddingX, startY);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = `${fontSize * 0.88}px "Pretendard", -apple-system, sans-serif`;
+      ctx.fillText(line2, paddingX, startY + lineHeight);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(line3, paddingX, startY + lineHeight * 2);
+
+      const watermarked = canvas.toDataURL('image/jpeg', 0.68);
+      setPhotoUrl(watermarked);
+    } catch (err) {
+      console.error('Image processing error:', err);
+      alert('사진을 처리하는 중 오류가 발생했습니다.');
+    } finally {
+      setIsProcessingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUrl('');
+    if (onRemovePhoto) onRemovePhoto();
+  };
+
   // 저장 처리
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,7 +257,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
       structureStatus,
       urgencyLevel,
       memo: memo.trim(),
-      photoCurrentUrl: capturedPhotoUrl || previousPhotoUrl || '',
+      photoCurrentUrl: photoUrl || previousPhotoUrl || '',
       photoPreviousUrl: previousPhotoUrl,
       gpsAccuracy: gpsAccuracy || 3.0,
       latitude: ditch.latitude,
@@ -181,7 +302,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
       structureStatus: '정상',
       urgencyLevel: '조치완료',
       memo: memo.trim() || '현장 점검 완료: 통수 원활 및 구조물 상태 양호 (패스트패스)',
-      photoCurrentUrl: capturedPhotoUrl || previousPhotoUrl || '',
+      photoCurrentUrl: photoUrl || previousPhotoUrl || '',
       photoPreviousUrl: previousPhotoUrl,
       gpsAccuracy: gpsAccuracy || 3.0,
       latitude: ditch.latitude,
@@ -204,6 +325,23 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-y-auto">
+      {/* 숨겨진 네이티브 카메라/앨범 파일 인풋 */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleImageFileSelect}
+        className="hidden"
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageFileSelect}
+        className="hidden"
+      />
+
       {/* 1. 상단 바 */}
       <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
         <div>
@@ -255,22 +393,31 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
               <Camera className="w-4 h-4 text-emerald-400" /> 촬영 사진 및 직전 비교
             </span>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onRetakePhoto}
-                className="text-xs text-slate-400 hover:text-emerald-400 underline font-medium"
-              >
-                다시 촬영
-              </button>
-              {capturedPhotoUrl && onRemovePhoto && (
-                <button
-                  type="button"
-                  onClick={onRemovePhoto}
-                  className="text-xs text-rose-400 hover:text-rose-300 underline font-medium"
-                >
-                  사진 삭제
-                </button>
-              )}
+              {photoUrl ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="text-xs text-slate-400 hover:text-emerald-400 underline font-medium"
+                  >
+                    카메라 재촬영
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="text-xs text-slate-400 hover:text-blue-400 underline font-medium"
+                  >
+                    앨범변경
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="text-xs text-rose-400 hover:text-rose-300 underline font-medium"
+                  >
+                    사진 삭제
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
 
@@ -295,37 +442,54 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
 
             {/* 금회 사진 */}
             <div className="relative rounded-xl overflow-hidden bg-slate-950 border-2 border-emerald-500 aspect-video flex items-center justify-center">
-              {capturedPhotoUrl ? (
+              {isProcessingPhoto ? (
+                <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+                  <span className="text-[11px] font-bold text-emerald-300">워터마크 각인 중...</span>
+                </div>
+              ) : photoUrl ? (
                 <>
                   <img
-                    src={capturedPhotoUrl}
+                    src={photoUrl}
                     alt="금회 점검 사진"
                     className="w-full h-full object-cover"
                   />
-                  <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                  <span className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">
                     금회 촬영 (NEW)
                   </span>
-                  {onRemovePhoto && (
-                    <button
-                      type="button"
-                      onClick={onRemovePhoto}
-                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-rose-600 text-white rounded-full flex items-center justify-center transition-colors active:scale-95 shadow"
-                      title="촬영된 사진 삭제"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-rose-600 text-white rounded-full flex items-center justify-center transition-colors active:scale-95 shadow"
+                    title="촬영된 사진 삭제"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={onRetakePhoto}
-                  className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-900 transition-all active:scale-95 p-2 text-center"
-                >
-                  <Camera className="w-6 h-6 text-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold text-slate-300">현장 사진 촬영하기</span>
-                  <span className="text-[10px] text-slate-500">(터치 시 카메라 실행)</span>
-                </button>
+                <div className="w-full h-full p-2 flex flex-col items-center justify-center gap-1.5 bg-slate-950">
+                  <div className="flex items-center gap-1.5 w-full">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex-1 py-2 px-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow"
+                    >
+                      <Camera className="w-4 h-4 text-white" />
+                      <span>카메라</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="flex-1 py-2 px-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all border border-slate-700"
+                    >
+                      <ImageIcon className="w-4 h-4 text-slate-300" />
+                      <span>앨범</span>
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    현장 사진 촬영/등록
+                  </span>
+                </div>
               )}
             </div>
           </div>
