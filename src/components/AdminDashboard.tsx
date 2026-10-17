@@ -1456,13 +1456,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* 📊 주간/월간 유지관리 종합보고서 1-클릭 인쇄/PDF 모달 */}
-      <ComprehensiveReportModal
-        isOpen={isComprehensiveReportOpen}
-        onClose={() => setIsComprehensiveReportOpen(false)}
-        ditches={ditches}
-        inspections={inspections}
-        alerts={alerts}
-      />
+      {isComprehensiveReportOpen && (
+        <ComprehensiveReportModal
+          isOpen={isComprehensiveReportOpen}
+          onClose={() => setIsComprehensiveReportOpen(false)}
+          ditches={ditches}
+          inspections={inspections}
+          alerts={alerts}
+        />
+      )}
     </div>
   );
 };

@@ -21,8 +21,6 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
   // 보고서 유형: 'weekly' (최근 7일) vs 'monthly' (최근 30일)
   const [reportType, setReportType] = useState<'weekly' | 'monthly'>('weekly');
 
-  if (!isOpen) return null;
-
   const today = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const formatYmd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -57,7 +55,25 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
 
   // 구역 목록
   const sections = ['정자 앞', '본관', '별관', '식수'];
-  const getSection = (d: DitchMaster) => (d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section || '정자 앞');
+  const getSection = (d: DitchMaster) => {
+    if (!d) return '정자 앞';
+    const s = d.section || '';
+    const n = d.name || '';
+    if (s === '식수' || n.includes('식수')) return '식수';
+    if (s === '본관' || n.includes('본관')) return '본관';
+    if (s === '별관' || n.includes('별관')) return '별관';
+    if (
+      s === '정자 앞' ||
+      s === '도로' ||
+      s === '주차장' ||
+      n.includes('정자 앞') ||
+      n.includes('도로') ||
+      n.includes('주차장')
+    ) {
+      return '정자 앞';
+    }
+    return s || '정자 앞';
+  };
 
   // 구역별 통계
   const sectionStats = useMemo(() => {
@@ -105,7 +121,7 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
       const aDanger = a.urgencyLevel === '긴급조치' || a.sedimentStatus === '완전막힘' ? 2 : a.sedimentStatus === '준설필요' ? 1 : 0;
       const bDanger = b.urgencyLevel === '긴급조치' || b.sedimentStatus === '완전막힘' ? 2 : b.sedimentStatus === '준설필요' ? 1 : 0;
       if (aDanger !== bDanger) return bDanger - aDanger;
-      return b.inspectedAt.localeCompare(a.inspectedAt);
+      return (b.inspectedAt || '').localeCompare(a.inspectedAt || '');
     });
     return withPhoto.slice(0, 4);
   }, [periodInspections]);
@@ -113,6 +129,9 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
   const handlePrint = () => {
     window.print();
   };
+
+  // 모달이 닫혀 있으면 렌더링하지 않음 (모든 Hook 호출 이후에 위치)
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-start overflow-y-auto p-2 sm:p-5">
@@ -313,7 +332,7 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
                         {(targetDitch?.name || '').replace(/(주차장|도로)/g, '정자 앞')}
                       </td>
                       <td className="border-r border-black p-1 text-center font-mono">
-                        {insp.inspectedAt.slice(5, 16)}
+                        {(insp.inspectedAt || '').slice(5, 16)}
                       </td>
                       <td className={`border-r border-black p-1 text-center font-bold ${insp.sedimentStatus === '완전막힘' ? 'text-rose-700' : 'text-amber-700'}`}>
                         {insp.sedimentStatus}
