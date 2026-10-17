@@ -211,7 +211,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> QUICK INSPECTION
           </span>
           <h2 className="text-lg font-black text-white truncate max-w-[240px] sm:max-w-md">
-            {ditch.name.replace(/주차장/g, '도로')}
+            {ditch.name.replace(/(주차장|도로)/g, '정자 앞')}
           </h2>
         </div>
         <button

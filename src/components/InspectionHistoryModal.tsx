@@ -113,7 +113,7 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
               </span>
             </div>
             <h3 className="font-black text-white text-base sm:text-lg truncate max-w-xs sm:max-w-md mt-0.5">
-              {ditch.name.replace(/주차장/g, '도로')} 과거 점검 이력
+              {ditch.name.replace(/(주차장|도로)/g, '정자 앞')} 과거 점검 이력
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">
               회차별로 점검데이터나 현장 사진을 각각 분리하여 선택 삭제할 수 있습니다.

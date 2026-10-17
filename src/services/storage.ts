@@ -29,24 +29,27 @@ export async function getDitches(): Promise<DitchMaster[]> {
       return INITIAL_DITCHES;
     }
 
-    // '주차장' -> '도로' 자동 마이그레이션 적용
+    // '주차장' / '도로' -> '정자 앞' 자동 마이그레이션 적용
     let hasChanges = false;
     data = data.map((d) => {
       if (
         d.section === '주차장' ||
+        d.section === '도로' ||
         d.name.includes('주차장') ||
+        d.name.includes('도로') ||
         d.code.includes('주차장') ||
-        (d.address && d.address.includes('주차장')) ||
-        (d.memo && d.memo.includes('주차장'))
+        d.code.includes('도로') ||
+        (d.address && (d.address.includes('주차장') || d.address.includes('도로'))) ||
+        (d.memo && (d.memo.includes('주차장') || d.memo.includes('도로')))
       ) {
         hasChanges = true;
         return {
           ...d,
-          section: d.section === '주차장' ? '도로' : d.section,
-          name: d.name.replace(/주차장/g, '도로'),
-          code: d.code.replace(/주차장/g, '도로'),
-          address: d.address ? d.address.replace(/주차장/g, '도로') : d.address,
-          memo: d.memo ? d.memo.replace(/주차장/g, '도로') : d.memo,
+          section: d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section,
+          name: d.name.replace(/(주차장|도로)/g, '정자 앞'),
+          code: d.code.replace(/(주차장|도로)/g, '정자 앞'),
+          address: d.address ? d.address.replace(/(주차장|도로)/g, '정자 앞') : d.address,
+          memo: d.memo ? d.memo.replace(/(주차장|도로)/g, '정자 앞') : d.memo,
         };
       }
       return d;
@@ -66,7 +69,15 @@ export async function getDitches(): Promise<DitchMaster[]> {
 // 1-1. 클라우드에서 받은 최신 데이터를 로컬 캐시(IndexedDB)에 저장 (동기화 보장)
 export async function setDitchesCache(ditches: DitchMaster[]): Promise<void> {
   try {
-    await set(DITCHES_KEY, ditches);
+    const normalized = ditches.map((d) => ({
+      ...d,
+      section: d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section,
+      name: d.name.replace(/(주차장|도로)/g, '정자 앞'),
+      code: d.code.replace(/(주차장|도로)/g, '정자 앞'),
+      address: d.address ? d.address.replace(/(주차장|도로)/g, '정자 앞') : d.address,
+      memo: d.memo ? d.memo.replace(/(주차장|도로)/g, '정자 앞') : d.memo,
+    }));
+    await set(DITCHES_KEY, normalized);
   } catch (err) {
     console.warn('Failed to update local ditches cache:', err);
   }

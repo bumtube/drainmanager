@@ -94,16 +94,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState<boolean>(false);
 
-  // 구역 목록 ('주차장' -> '도로' 변환 반영)
+  // 구역 목록 ('주차장'/'도로' -> '정자 앞' 변환 반영)
   const sections = Array.from(
-    new Set(ditches.map((d) => (d.section === '주차장' ? '도로' : d.section || '도로')))
+    new Set(ditches.map((d) => (d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section || '정자 앞')))
   );
 
-  // FMS 표준 구역별 요약 지표 (도로, 본관, 별관, 식수)
+  // FMS 표준 구역별 요약 지표 (정자 앞, 본관, 별관, 식수)
   const sectionSummaryList = useMemo(() => {
-    const list = ['도로', '본관', '별관', '식수'];
+    const list = ['정자 앞', '본관', '별관', '식수'];
     return list.map((sec) => {
-      const secDitches = ditches.filter((d) => (d.section === '주차장' ? '도로' : d.section || '도로') === sec);
+      const secDitches = ditches.filter((d) => (d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section || '정자 앞') === sec);
       const total = secDitches.length;
       const goodCount = secDitches.filter((d) => d.currentStatus === 'GOOD').length;
       const issueCount = secDitches.filter((d) => d.currentStatus === 'WARNING' || d.currentStatus === 'DANGER').length;
@@ -126,7 +126,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       (d.address && d.address.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchStatus = statusFilter === 'ALL' || d.currentStatus === statusFilter;
-    const currentSection = d.section === '주차장' ? '도로' : d.section;
+    const currentSection = d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section;
     const matchSection = sectionFilter === 'ALL' || currentSection === sectionFilter;
     const matchEmergency = !onlyEmergency || d.currentStatus === 'DANGER';
     const matchOverdue = !onlyOverdue || getDitchOverdueInfo(d, 14).isOverdue;
@@ -206,8 +206,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       // 5. 공구/구역
       if (sortField === 'section') {
-        const secA = a.section === '주차장' ? '도로' : a.section || '';
-        const secB = b.section === '주차장' ? '도로' : b.section || '';
+        const secA = a.section === '주차장' || a.section === '도로' ? '정자 앞' : a.section || '';
+        const secB = b.section === '주차장' || b.section === '도로' ? '정자 앞' : b.section || '';
         const comp = secA.localeCompare(secB, 'ko');
         return sortDirection === 'asc' ? comp : -comp;
       }
@@ -290,9 +290,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // 배수로 데이터 삭제 확인 핸들러
   const handleDeleteDitchConfirm = async (ditch: DitchMaster) => {
-    const ditchName = ditch.name.replace(/주차장/g, '도로');
+    const ditchName = ditch.name.replace(/(주차장|도로)/g, '정자 앞');
+    const ditchCode = ditch.code.replace(/(주차장|도로)/g, '정자 앞');
     const confirmed = window.confirm(
-      `🚨 [배수로 시설물 영구 삭제]\n\n관리번호: ${ditch.code}\n배수로명: ${ditchName}\n\n정말로 이 배수로 등록데이터를 삭제하시겠습니까?\n\n※ 삭제 시 연관된 모든 점검 이력과 현장 사진도 함께 삭제되며, 클라우드에서도 즉시 제거됩니다.`
+      `🚨 [배수로 시설물 영구 삭제]\n\n관리번호: ${ditchCode}\n배수로명: ${ditchName}\n\n정말로 이 배수로 등록데이터를 삭제하시겠습니까?\n\n※ 삭제 시 연관된 모든 점검 이력과 현장 사진도 함께 삭제되며, 클라우드에서도 즉시 제거됩니다.`
     );
     if (confirmed && onDeleteDitch) {
       try {
@@ -788,7 +789,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           className="hover:text-emerald-400 hover:underline transition-colors text-left font-mono"
                           title="클릭하여 점검 이력 및 사진 조회"
                         >
-                          {ditch.code.replace(/주차장/g, '도로')}
+                          {ditch.code.replace(/(주차장|도로)/g, '정자 앞')}
                         </button>
                       </td>
                       <td className="py-3 px-4">
@@ -799,18 +800,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           title="클릭하여 점검 이력 및 현장 사진 열람"
                         >
                           <span className="font-bold text-white group-hover/name:text-emerald-400 group-hover:text-emerald-400 transition-colors">
-                            {ditch.name.replace(/주차장/g, '도로')}
+                            {ditch.name.replace(/(주차장|도로)/g, '정자 앞')}
                           </span>
                           <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 font-medium hidden sm:inline-block">
                             이력/사진
                           </span>
                         </button>
                         <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">
-                          {ditch.address || '-'}
+                          {(ditch.address || '-').replace(/(주차장|도로)/g, '정자 앞')}
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-300 hidden md:table-cell">
-                        {ditch.section === '주차장' ? '도로' : ditch.section}
+                        {ditch.section === '주차장' || ditch.section === '도로' ? '정자 앞' : ditch.section}
                       </td>
                       <td className="py-3 px-4 text-slate-400 font-mono text-xs hidden lg:table-cell">
                         {ditch.dimension}

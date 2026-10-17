@@ -1,19 +1,19 @@
 import { DitchMaster, InspectionRecord } from '../types';
 
-// 기본 초기 데모 배수로 데이터 (성남시 분당구 불정로 50 부지: 도로, 본관, 별관, 식수)
+// 기본 초기 데모 배수로 데이터 (성남시 분당구 불정로 50 부지: 정자 앞, 본관, 별관, 식수)
 export const INITIAL_DITCHES: DitchMaster[] = [
   {
     id: 'ditch-001',
-    code: 'DRAIN-도로-1',
-    name: '도로-1',
-    section: '도로',
+    code: 'DRAIN-정자 앞-1',
+    name: '정자 앞-1',
+    section: '정자 앞',
     dimension: 'U형 0.6m',
     latitude: 37.35742,
     longitude: 127.11225,
     currentStatus: 'GOOD',
     lastInspectedAt: '2026-10-10 14:30',
-    address: '경기도 성남시 분당구 불정로 50 (도로 진입로)',
-    memo: '도로 빗물받이 연결 수로. 통수 상태 양호.',
+    address: '경기도 성남시 분당구 불정로 50 (정자 앞 진입로)',
+    memo: '정자 앞 빗물받이 연결 수로. 통수 상태 양호.',
     createdAt: '2026-03-01 09:00',
   },
   {
@@ -89,8 +89,8 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     sedimentStatus: '정상(<30%)',
     structureStatus: '정상',
     urgencyLevel: '정기점검',
-    memo: '도로 진입로 배수로 통수 이상 없음.',
-    photoCurrentUrl: createSampleDrainSvg('도로 배수로 1호', '#22c55e', '정상'),
+    memo: '정자 앞 진입로 배수로 통수 이상 없음.',
+    photoCurrentUrl: createSampleDrainSvg('정자 앞 배수로 1호', '#22c55e', '정상'),
     gpsAccuracy: 2.5,
     latitude: 37.35742,
     longitude: 127.11225,

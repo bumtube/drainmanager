@@ -56,8 +56,8 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
   const countDanger = periodInspections.filter((i) => i.urgencyLevel === '긴급조치' || i.sedimentStatus === '완전막힘' || i.structureStatus === '파손/붕괴').length;
 
   // 구역 목록
-  const sections = ['도로', '본관', '별관', '식수'];
-  const getSection = (d: DitchMaster) => (d.section === '주차장' ? '도로' : d.section || '도로');
+  const sections = ['정자 앞', '본관', '별관', '식수'];
+  const getSection = (d: DitchMaster) => (d.section === '주차장' || d.section === '도로' ? '정자 앞' : d.section || '정자 앞');
 
   // 구역별 통계
   const sectionStats = useMemo(() => {
@@ -307,10 +307,10 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
                   return (
                     <tr key={insp.id} className="border-b border-black">
                       <td className="border-r border-black p-1 font-mono font-bold text-center">
-                        {(targetDitch?.code || '').replace(/주차장/g, '도로')}
+                        {(targetDitch?.code || '').replace(/(주차장|도로)/g, '정자 앞')}
                       </td>
                       <td className="border-r border-black p-1 font-semibold">
-                        {(targetDitch?.name || '').replace(/주차장/g, '도로')}
+                        {(targetDitch?.name || '').replace(/(주차장|도로)/g, '정자 앞')}
                       </td>
                       <td className="border-r border-black p-1 text-center font-mono">
                         {insp.inspectedAt.slice(5, 16)}
@@ -352,7 +352,7 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
                   const overdue = getDitchOverdueInfo(d, 14);
                   return (
                     <div key={d.id} className="p-1.5 bg-white border border-gray-300 rounded flex justify-between items-center">
-                      <span className="font-bold truncate">{(d.name || '').replace(/주차장/g, '도로')}</span>
+                      <span className="font-bold truncate">{(d.name || '').replace(/(주차장|도로)/g, '정자 앞')}</span>
                       <span className="font-bold text-rose-700 shrink-0 ml-1 font-mono">[{overdue.label}]</span>
                     </div>
                   );
@@ -387,8 +387,8 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
                     </div>
                     <div className="text-[9.5px] space-y-0.5 leading-tight font-medium">
                       <div className="font-bold text-gray-900 flex justify-between">
-                        <span>[사진 {idx + 1}] {(targetDitch?.name || '').replace(/주차장/g, '도로')}</span>
-                        <span className="font-mono text-gray-500">{(targetDitch?.code || '').replace(/주차장/g, '도로')}</span>
+                        <span>[사진 {idx + 1}] {(targetDitch?.name || '').replace(/(주차장|도로)/g, '정자 앞')}</span>
+                        <span className="font-mono text-gray-500">{(targetDitch?.code || '').replace(/(주차장|도로)/g, '정자 앞')}</span>
                       </div>
                       <div className="text-gray-600 flex justify-between font-mono">
                         <span>점검일시: {insp.inspectedAt}</span>

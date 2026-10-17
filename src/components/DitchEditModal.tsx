@@ -11,8 +11,8 @@ interface DitchEditModalProps {
   onClose: () => void;
 }
 
-// 현장 맞춤형 4개 구역 (도로, 본관, 별관, 식수)
-const SECTIONS = ['도로', '본관', '별관', '식수'] as const;
+// 현장 맞춤형 4개 구역 (정자 앞, 본관, 별관, 식수)
+const SECTIONS = ['정자 앞', '본관', '별관', '식수'] as const;
 
 export const DitchEditModal: React.FC<DitchEditModalProps> = ({
   ditch,
@@ -24,13 +24,13 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
 }) => {
   const isNew = !ditch;
 
-  // 1. 구역 선택 (도로, 본관, 별관, 식수)
+  // 1. 구역 선택 (정자 앞, 본관, 별관, 식수)
   const initialSection =
-    ditch?.section === '주차장'
-      ? '도로'
+    ditch?.section === '주차장' || ditch?.section === '도로'
+      ? '정자 앞'
       : ditch?.section && SECTIONS.includes(ditch.section as any)
       ? ditch.section
-      : '도로';
+      : '정자 앞';
   const [section, setSection] = useState<string>(initialSection);
 
   // 구역별 다음 번호 자동 계산 유틸
@@ -91,7 +91,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
 
-    // 명칭: "도로-1", "본관-2", "식수-1" 형태로 명확하게 생성
+    // 명칭: "정자 앞-1", "본관-2", "식수-1" 형태로 명확하게 생성
     const autoName = `${section}-${ditchNumber}`;
     const autoCode = `DRAIN-${section}-${ditchNumber}`;
     const defaultDim = section === '식수' ? '조경 수목 주변 배수' : '표준 U형 배수로';

@@ -156,18 +156,29 @@ export const MapView: React.FC<MapViewProps> = ({
     [37.3611, 127.1149]  // 북동쪽 (NE: 북 300m, 동 300m)
   );
 
-  // 구역 선택 필터 상태 ('ALL' | '도로' | '본관' | '별관' | '식수')
-  const [selectedSection, setSelectedSection] = useState<string>('ALL');
+  // 구역 선택 기본값: '정자 앞', '본관', '별관'만 기본 선택 (사용자 요청: 최초에 전체가 아닌 정자 앞·본관·별관만 선택)
+  const DEFAULT_SECTIONS = ['정자 앞', '본관', '별관'];
+  const [selectedSections, setSelectedSections] = useState<string[]>(DEFAULT_SECTIONS);
+  const [isOverdueFilter, setIsOverdueFilter] = useState<boolean>(false);
 
-  // 구역 명칭 정규화 유틸 ('주차장' -> '도로' 변환 및 '식수' 감지)
+  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞' 변환 및 '식수' 감지)
   const getNormalizedSection = (d: DitchMaster): string => {
     const s = d.section || '';
     const n = d.name || '';
     if (s === '식수' || n.includes('식수')) return '식수';
     if (s === '본관' || n.includes('본관')) return '본관';
     if (s === '별관' || n.includes('별관')) return '별관';
-    if (s === '도로' || s === '주차장' || n.includes('도로') || n.includes('주차장')) return '도로';
-    return s || '도로';
+    if (
+      s === '정자 앞' ||
+      s === '도로' ||
+      s === '주차장' ||
+      n.includes('정자 앞') ||
+      n.includes('도로') ||
+      n.includes('주차장')
+    ) {
+      return '정자 앞';
+    }
+    return s || '정자 앞';
   };
 
   // SVG/HTML 마커 생성 유틸 (추천 3번: 미니 구역 꼬리표 라벨 + 원형 핀 마커 + 번호/식수 나무아이콘)
@@ -195,7 +206,7 @@ export const MapView: React.FC<MapViewProps> = ({
       ? `<span class="absolute -top-1.5 -left-1.5 w-4 h-4 bg-amber-500 border border-white text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow animate-pulse z-10" title="장기 미점검 (${overdueInfo.daysElapsed === 999 ? '미점검' : `${overdueInfo.daysElapsed}일 경과`})">⚠️</span>`
       : '';
 
-    // 배수로 명칭에서 번호(숫자) 추출 (예: '도로-1' -> '1', '본관-2' -> '2', '식수-3' -> '3')
+    // 배수로 명칭에서 번호(숫자) 추출 (예: '정자 앞-1' -> '1', '본관-2' -> '2', '식수-3' -> '3')
     const match = ditch.name?.match(/\d+/);
     const ditchNumber = match ? match[0] : (ditch.name || '1');
 
@@ -383,11 +394,13 @@ export const MapView: React.FC<MapViewProps> = ({
 
     markersLayerRef.current.clearLayers();
 
-    // 선택된 구역 필터링 적용 (전체 / 도로 / 본관 / 별관 / 식수 / 장기미점검)
+    // 선택된 구역 필터링 적용 (기본값: '정자 앞', '본관', '별관')
     const filteredDitches = ditches.filter((ditch) => {
-      if (selectedSection === 'ALL') return true;
-      if (selectedSection === 'OVERDUE') return getDitchOverdueInfo(ditch, 14).isOverdue;
-      return getNormalizedSection(ditch) === selectedSection;
+      if (isOverdueFilter && !getDitchOverdueInfo(ditch, 14).isOverdue) {
+        return false;
+      }
+      const sec = getNormalizedSection(ditch);
+      return selectedSections.includes(sec);
     });
 
     filteredDitches.forEach((ditch) => {
@@ -421,7 +434,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       marker.addTo(markersLayerRef.current!);
     });
-  }, [ditches, selectedDitch, userRole, selectedSection]);
+  }, [ditches, selectedDitch, userRole, selectedSections, isOverdueFilter]);
 
   // 3-1. 긴급상황 경광등 마커 아이콘 생성 (붉은색 플래시 핑 + 입체 경광등 뱃지)
   const createEmergencyAlertMarkerIcon = (alert: EmergencyAlert, isSelected: boolean) => {
@@ -676,31 +689,77 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         </div>
 
-        {/* 5. 구역 선택 필터 메뉴 (전체 / 도로 / 본관 / 별관 / 식수) */}
+        {/* 5. 구역 선택 필터 메뉴 (전체 / 정자 앞 / 본관 / 별관 / 식수) */}
         <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-0.5 px-0.5 no-scrollbar">
-          {(['ALL', '도로', '본관', '별관', '식수'] as const).map((sec) => {
-            const isCurrent = selectedSection === sec;
-            const count =
-              sec === 'ALL'
-                ? ditches.length
-                : ditches.filter((d) => getNormalizedSection(d) === sec).length;
-            const label = sec === 'ALL' ? '전체' : sec === '식수' ? '🌲 식수' : sec;
+          {/* 전체 버튼 */}
+          {(() => {
+            const allDitchesCount = ditches.length;
+            const isAllSelected = selectedSections.length === 4;
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAllSelected) {
+                    // 이미 전체 선택된 상태에서 클릭 시 기본값(정자 앞, 본관, 별관)으로 복귀
+                    setSelectedSections(['정자 앞', '본관', '별관']);
+                  } else {
+                    // 전체 4개 구역 모두 선택
+                    setSelectedSections(['정자 앞', '본관', '별관', '식수']);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
+                  isAllSelected
+                    ? 'bg-blue-600 text-white border-blue-400 shadow-blue-950/80 ring-2 ring-blue-400/40'
+                    : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
+                }`}
+                title="클릭 시 전체 구역(식수 포함) 토글"
+              >
+                <span>전체</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                    isAllSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {allDitchesCount}
+                </span>
+              </button>
+            );
+          })()}
+
+          {/* 4개 개별 구역 버튼 (기본 선택: 정자 앞, 본관, 별관) */}
+          {(['정자 앞', '본관', '별관', '식수'] as const).map((sec) => {
+            const isSelected = selectedSections.includes(sec);
+            const count = ditches.filter((d) => getNormalizedSection(d) === sec).length;
+            const label = sec === '식수' ? '🌲 식수' : sec;
 
             return (
               <button
                 key={sec}
                 type="button"
-                onClick={() => setSelectedSection(sec)}
+                onClick={() => {
+                  if (isSelected) {
+                    // 이미 선택되어 있으면 해제 (단, 마지막 1개면 기본값으로 초기화)
+                    if (selectedSections.length > 1) {
+                      setSelectedSections((prev) => prev.filter((s) => s !== sec));
+                    } else {
+                      setSelectedSections(['정자 앞', '본관', '별관']);
+                    }
+                  } else {
+                    // 미선택 상태면 추가 선택
+                    setSelectedSections((prev) => [...prev, sec]);
+                  }
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
-                  isCurrent
+                  isSelected
                     ? 'bg-blue-600 text-white border-blue-400 shadow-blue-950/80 ring-2 ring-blue-400/40'
                     : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
                 }`}
+                title={`${label} 구역 표시/숨김 토글`}
               >
                 <span>{label}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
-                    isCurrent ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
+                    isSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
                   }`}
                 >
                   {count}
@@ -713,13 +772,12 @@ export const MapView: React.FC<MapViewProps> = ({
           {(() => {
             const overdueCount = ditches.filter((d) => getDitchOverdueInfo(d, 14).isOverdue).length;
             if (overdueCount === 0) return null;
-            const isCurrent = selectedSection === 'OVERDUE';
             return (
               <button
                 type="button"
-                onClick={() => setSelectedSection(isCurrent ? 'ALL' : 'OVERDUE')}
+                onClick={() => setIsOverdueFilter((prev) => !prev)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
-                  isCurrent
+                  isOverdueFilter
                     ? 'bg-amber-600 text-white border-amber-400 shadow-amber-950/80 ring-2 ring-amber-400/40'
                     : 'bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 border-amber-600/70 backdrop-blur-md animate-pulse'
                 }`}
@@ -728,7 +786,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 <span>⚠️ 장기미점검</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
-                    isCurrent ? 'bg-amber-800 text-amber-100' : 'bg-amber-900 text-amber-200'
+                    isOverdueFilter ? 'bg-amber-800 text-amber-100' : 'bg-amber-900 text-amber-200'
                   }`}
                 >
                   {overdueCount}
@@ -1120,7 +1178,7 @@ export const MapView: React.FC<MapViewProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold bg-slate-800 px-2 py-0.5 rounded text-slate-300">
-                  {selectedDitch.code.replace(/주차장/g, '도로')}
+                  {selectedDitch.code.replace(/(주차장|도로)/g, '정자 앞')}
                 </span>
                 <span
                   className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
@@ -1151,14 +1209,14 @@ export const MapView: React.FC<MapViewProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-black text-white">
                   {getNormalizedSection(selectedDitch) === '식수' ? '🌲 ' : ''}
-                  {selectedDitch.name.replace(/주차장/g, '도로')}
+                  {selectedDitch.name.replace(/(주차장|도로)/g, '정자 앞')}
                 </h3>
                 <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-300 border border-slate-700">
                   {getNormalizedSection(selectedDitch)}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                {(selectedDitch.address || selectedDitch.section || '').replace(/주차장/g, '도로')}
+                {(selectedDitch.address || selectedDitch.section || '').replace(/(주차장|도로)/g, '정자 앞')}
               </p>
               <div className="flex gap-3 text-[11px] text-slate-300 mt-1 font-medium">
                 <span>규격: {selectedDitch.dimension}</span>

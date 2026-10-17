@@ -3,7 +3,7 @@
 
 export const MAP_TILES_CACHE_NAME = 'drainmanager-map-tiles-v1';
 
-// 성남시 분당구 불정로 50 부지 및 주변 도로 경계 좌표
+// 성남시 분당구 불정로 50 부지 및 주변 정자 앞/시설 경계 좌표
 const BOUNDS = {
   minLat: 37.3557,
   maxLat: 37.3611,

@@ -122,8 +122,8 @@ export const GhostCamera: React.FC<GhostCameraProps> = ({
     const lng = currentGps?.longitude ? currentGps.longitude.toFixed(6) : ditch.longitude.toFixed(6);
     const acc = currentGps?.accuracy ? ` (오차: ${currentGps.accuracy.toFixed(1)}m)` : '';
 
-    const safeCode = ditch.code.replace(/주차장/g, '도로');
-    const safeName = ditch.name.replace(/주차장/g, '도로');
+    const safeCode = ditch.code.replace(/(주차장|도로)/g, '정자 앞');
+    const safeName = ditch.name.replace(/(주차장|도로)/g, '정자 앞');
     const line1 = `[배수로 현장점검] ${safeCode} | ${safeName}`;
     const line2 = `일시: ${formattedDate} | 점검자: ${inspectorName}`;
     const line3 = `위치: N ${lat}, E ${lng}${acc}`;
