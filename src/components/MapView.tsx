@@ -681,8 +681,8 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         </div>
 
-        {/* 5. 구역 선택 필터 메뉴 (전체 / 정자 앞 / 본관3층 / 본관4층 / 별관 / 식수) */}
-        <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-0.5 px-0.5 no-scrollbar">
+        {/* 5. 구역 선택 필터 메뉴 (모바일 3열 2줄 그리드, PC 가로 1열 - 스크롤 잘림 완전 해결) */}
+        <div className="pointer-events-auto grid grid-cols-3 sm:flex sm:items-center gap-1.5 py-0.5 px-0.5 max-w-xl">
           {/* 전체 버튼 */}
           {(() => {
             const allDitchesCount = ditches.length;
@@ -700,10 +700,10 @@ export const MapView: React.FC<MapViewProps> = ({
                     setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관', '식수']);
                   }
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
+                className={`w-full sm:w-auto px-2 sm:px-3 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md ${
                   isAllSelected
                     ? allTheme.btnActive
-                    : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-white/10 backdrop-blur-md'
                 }`}
                 title="클릭 시 전체 구역(식수 포함) 토글"
               >
@@ -743,16 +743,16 @@ export const MapView: React.FC<MapViewProps> = ({
                     setSelectedSections((prev) => [...prev, sec]);
                   }
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
+                className={`w-full sm:w-auto px-2 sm:px-3 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md ${
                   isSelected
                     ? secTheme.btnActive
-                    : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
+                    : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-white/10 backdrop-blur-md'
                 }`}
                 title={`${label} 구역 표시/숨김 토글`}
               >
                 {!isSelected && (
                   <span
-                    className={`w-2 h-2 rounded-full ${secTheme.dotBg} shrink-0 opacity-80`}
+                    className={`w-1.5 h-1.5 rounded-full ${secTheme.dotBg} shrink-0 opacity-80`}
                   />
                 )}
                 <span>{label}</span>
@@ -775,20 +775,20 @@ export const MapView: React.FC<MapViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsOverdueFilter((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
+                className={`col-span-3 sm:col-span-1 w-full sm:w-auto px-3 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center sm:justify-start gap-1.5 shadow-md ${
                   isOverdueFilter
                     ? 'bg-amber-600 text-white border-amber-400 shadow-amber-950/80 ring-2 ring-amber-400/40'
-                    : 'bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 border-amber-600/70 backdrop-blur-md animate-pulse'
+                    : 'bg-amber-950/80 hover:bg-amber-900/80 text-amber-300 border-amber-600/70 backdrop-blur-md'
                 }`}
                 title="14일 이상 미점검 시설물만 필터링"
               >
-                <span>⚠️ 장기미점검</span>
+                <span>⚠️ 장기미점검 시설물</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
                     isOverdueFilter ? 'bg-amber-800 text-amber-100' : 'bg-amber-900 text-amber-200'
                   }`}
                 >
-                  {overdueCount}
+                  {overdueCount}개소
                 </span>
               </button>
             );
@@ -806,70 +806,49 @@ export const MapView: React.FC<MapViewProps> = ({
         )}
       </div>
 
-      {/* 3. 우측 컨트롤 버튼 (내 위치로 이동, 복지관 부지 원위치, 줌 등) */}
-      <div className="absolute right-3 top-28 sm:top-24 z-10 flex flex-col gap-2.5">
+      {/* 3. 우측 컨트롤 버튼 (Apple Frosted Glass 스타일: 내 위치, 복지관 센터, 긴급 경광등) */}
+      <div className="absolute right-3 top-36 sm:top-24 z-10 flex flex-col gap-2">
         <button
           onClick={handlePanToCurrentLocation}
-          className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+          className="w-11 h-11 bg-slate-900/80 hover:bg-slate-800 text-white rounded-2xl shadow-xl flex items-center justify-center border border-white/10 backdrop-blur-xl active:scale-95 transition-all"
           title="현재 내 위치로 이동"
         >
-          <Navigation className="w-6 h-6 text-blue-400" />
+          <Navigation className="w-5 h-5 text-blue-400" />
         </button>
 
         <button
           onClick={handlePanToFacilityCenter}
-          className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+          className="w-11 h-11 bg-slate-900/80 hover:bg-slate-800 text-white rounded-2xl shadow-xl flex items-center justify-center border border-white/10 backdrop-blur-xl active:scale-95 transition-all"
           title="불정로 50 화면 센터로 이동"
         >
-          <MapPin className="w-6 h-6 text-emerald-400" />
+          <MapPin className="w-5 h-5 text-emerald-400" />
         </button>
 
-        <button
-          onClick={() => mapRef.current?.zoomIn()}
-          className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 font-bold text-xl active:scale-95"
-        >
-          +
-        </button>
-        <button
-          onClick={() => mapRef.current?.zoomOut()}
-          className="w-12 h-12 bg-slate-900/90 hover:bg-slate-800 text-white rounded-xl shadow-xl flex items-center justify-center border border-slate-700 font-bold text-xl active:scale-95"
-        >
-          -
-        </button>
-
-        {/* 🚨 5번째 버튼: 긴급상황 경광등 핀 생성 버튼 */}
+        {/* 🚨 긴급상황 경광등 핀 생성 버튼 */}
         <button
           type="button"
           onClick={handleTriggerEmergencyAlert}
           disabled={isCreatingAlert}
-          className={`w-12 h-12 rounded-xl shadow-2xl flex items-center justify-center active:scale-95 transition-all relative group ${
+          className={`w-11 h-11 rounded-2xl shadow-xl flex items-center justify-center active:scale-95 transition-all relative border backdrop-blur-xl ${
             alerts.length > 0
-              ? 'bg-rose-950/95 hover:bg-rose-900 text-white border-2 border-rose-500 shadow-rose-950/90 animate-pulse'
-              : 'bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 shadow-slate-950/80'
+              ? 'bg-rose-950/90 text-white border-rose-500 shadow-rose-950/80'
+              : 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-white/10'
           }`}
           title={
             alerts.length > 0
               ? `긴급상황 경광등 ${alerts.length}건 발생 중 (클릭 시 현재 위치에 긴급상황 핀 등록)`
-              : '현재 위치에 긴급상황 경광등 핀 등록 (경고데이터 없음: 정지 중)'
+              : '현재 위치에 긴급상황 경광등 핀 등록'
           }
         >
-          {/* 경광등 아이콘: 경고데이터가 없으면 정지, 경고데이터가 있을 때만 동작 */}
           <Siren
-            className={`w-6 h-6 transition-all ${
-              alerts.length > 0
-                ? 'text-rose-400 animate-bounce'
-                : 'text-slate-400 group-hover:text-rose-400'
+            className={`w-5 h-5 transition-colors ${
+              alerts.length > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-400'
             }`}
           />
 
-          {/* 경고데이터가 있을 때만 작동: 레이더 핑 애니메이션 */}
+          {/* 발생 건수 뱃지 */}
           {alerts.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 animate-ping opacity-75 pointer-events-none" />
-          )}
-
-          {/* 1. 경고데이터가 있을 때만 모서리에 숫자로 개수 표시 */}
-          {alerts.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 border-2 border-white text-white text-[11px] font-black flex items-center justify-center leading-none z-10 shadow-lg shadow-rose-950 animate-bounce">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 px-1 rounded-full bg-rose-600 border border-white text-white text-[10px] font-black flex items-center justify-center leading-none z-10 shadow">
               {alerts.length}
             </span>
           )}
@@ -1169,35 +1148,38 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* 5. 배수로 선택 바텀시트 (Bottom Sheet) */}
+      {/* 5. 배수로 선택 바텀시트 (Apple Maps 스타일) */}
       {selectedDitch && (
-        <div className="absolute bottom-0 inset-x-0 z-30 p-3 sm:p-4 max-w-lg mx-auto">
-          <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-2xl p-4 shadow-2xl text-white space-y-3 animate-in slide-in-from-bottom duration-200">
+        <div className="absolute bottom-0 inset-x-0 z-30 p-2.5 sm:p-4 max-w-lg mx-auto">
+          <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 shadow-2xl text-white space-y-3 animate-in slide-in-from-bottom duration-200">
+            {/* Apple 상단 스와이프 핸들 바 */}
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto -mt-1 mb-1" />
+
             {/* 상단 닫기 & 상태 뱃지 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold bg-slate-800 px-2 py-0.5 rounded text-slate-300">
+                <span className="font-mono text-xs font-black bg-white/10 px-2 py-0.5 rounded-lg text-slate-200">
                   {selectedDitch.code.replace(/(주차장|도로)/g, '정자 앞')}
                 </span>
                 <span
-                  className={`text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                  className={`text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
                     selectedDitch.currentStatus === 'GOOD'
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                       : selectedDitch.currentStatus === 'WARNING'
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      : 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
                   }`}
                 >
                   {selectedDitch.currentStatus === 'GOOD'
-                    ? '정상 (양호)'
+                    ? '정상'
                     : selectedDitch.currentStatus === 'WARNING'
-                    ? '주의 (준설요망)'
-                    : '긴급조치 요망'}
+                    ? '주의'
+                    : '긴급'}
                 </span>
               </div>
               <button
                 onClick={() => onSelectDitch(null)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                className="p-1 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1269,7 +1251,7 @@ export const MapView: React.FC<MapViewProps> = ({
                         setIsFastPassing(false);
                       }
                     }}
-                    className="w-full h-12 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 active:scale-95 transition-all"
+                    className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-96 transition-all"
                   >
                     <Zap className="w-5 h-5 text-slate-950 fill-current" />
                     <span>{isFastPassing ? '저장 중...' : '⚡ 5초 패스트패스 (전부 정상 즉시 완료)'}</span>
@@ -1282,14 +1264,14 @@ export const MapView: React.FC<MapViewProps> = ({
                         ? onOpenInspectionForm(selectedDitch)
                         : onStartInspection(selectedDitch)
                     }
-                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-blue-950/50 active:scale-95 transition-all"
+                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 shadow active:scale-96 transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4 text-blue-200" />
                     상세 점검 (사진/체크)
                   </button>
                   <button
                     onClick={() => onViewHistory(selectedDitch)}
-                    className="h-11 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95"
+                    className="h-11 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-96 transition-all"
                   >
                     <History className="w-4 h-4 text-emerald-400" />
                     과거 점검 이력
@@ -1319,7 +1301,7 @@ export const MapView: React.FC<MapViewProps> = ({
                         setIsFastPassing(false);
                       }
                     }}
-                    className="w-full h-11 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/60 active:scale-95 transition-all"
+                    className="w-full h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-96 transition-all"
                   >
                     <Zap className="w-4 h-4 text-slate-950 fill-current" />
                     <span>{isFastPassing ? '저장 중...' : '⚡ 5초 패스트패스 (전부 정상 즉시 완료)'}</span>
@@ -1332,14 +1314,14 @@ export const MapView: React.FC<MapViewProps> = ({
                         ? onOpenInspectionForm(selectedDitch)
                         : onStartInspection(selectedDitch)
                     }
-                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 active:scale-96 shadow transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4 text-blue-200" />
                     상세 점검
                   </button>
                   <button
                     onClick={() => onEditDitch(selectedDitch)}
-                    className="h-11 bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95"
+                    className="h-11 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-96 transition-all"
                   >
                     <Edit className="w-4 h-4" />
                     정보 수정
@@ -1347,7 +1329,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 </div>
                 <button
                   onClick={() => onViewHistory(selectedDitch)}
-                  className="w-full h-10 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-slate-700"
+                  className="w-full h-10 bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-96 transition-all"
                 >
                   <History className="w-4 h-4 text-emerald-400" />
                   과거 점검 이력 타임라인 조회

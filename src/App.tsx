@@ -49,6 +49,8 @@ import { RoleSelector } from './components/RoleSelector';
 import { FirebaseModal } from './components/FirebaseModal';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
 import { GpsHelpModal } from './components/GpsHelpModal';
+import { AdminSplitSidebar } from './components/AdminSplitSidebar';
+import { ComprehensiveReportModal } from './components/ComprehensiveReportModal';
 import {
   subscribeToSyncStatus,
   getCurrentSyncStatus,
@@ -83,6 +85,7 @@ export const App: React.FC = () => {
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState<boolean>(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
   const [isGpsHelpModalOpen, setIsGpsHelpModalOpen] = useState<boolean>(false);
+  const [isComprehensiveReportOpen, setIsComprehensiveReportOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getCurrentSyncStatus());
 
   // 점검 진행 중 임시 사진 및 GPS
@@ -476,8 +479,8 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans select-none">
-      {/* 1. 최상단 네비게이션 헤더 */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800 px-3 sm:px-4 flex items-center justify-between z-20 shadow-md">
+      {/* 1. 최상단 네비게이션 헤더 (Apple Frosted Glass) */}
+      <header className="h-14 bg-slate-900/85 backdrop-blur-xl border-b border-white/10 px-3 sm:px-4 flex items-center justify-between z-20 shadow-md">
         {/* 좌측 로고 및 앱 타이틀 (클릭 시 메인 첫 화면인 현장 지도로 이동) */}
         <button
           type="button"
@@ -499,24 +502,24 @@ export const App: React.FC = () => {
           </div>
         </button>
 
-        {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 전환) */}
+        {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 전환 - Apple Segmented Control) */}
         {userRole === 'ADMIN' && (
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex bg-slate-950/80 p-1 rounded-2xl border border-white/10 shadow-inner">
             <button
               onClick={() => setCurrentView('map')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 ${
                 currentView === 'map'
-                  ? 'bg-blue-600 text-white shadow'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <MapIcon className="w-3.5 h-3.5" /> 현장 지도
+              <MapIcon className="w-3.5 h-3.5" /> <span className="hidden sm:inline">실시간 관제</span>지도
             </button>
             <button
               onClick={() => setCurrentView('dashboard')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all relative ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 relative ${
                 currentView === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -534,9 +537,9 @@ export const App: React.FC = () => {
           {userRole === 'ADMIN' && (
             <button
               onClick={() => setIsOfflineModalOpen(true)}
-              className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+              className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
                 !syncStatus.isOnline
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30 animate-pulse'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
                   : syncStatus.pendingCount > 0
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
                   : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
@@ -582,7 +585,7 @@ export const App: React.FC = () => {
               refreshGpsLocation();
               setIsGpsHelpModalOpen(true);
             }}
-            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+            className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
               gpsErrorMsg
                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
                 : currentGps
@@ -600,10 +603,10 @@ export const App: React.FC = () => {
             <Navigation
               className={`w-4 h-4 shrink-0 ${
                 gpsErrorMsg
-                  ? 'text-rose-400 animate-bounce'
+                  ? 'text-rose-400'
                   : currentGps
                   ? 'text-emerald-400'
-                  : 'text-amber-400 animate-spin'
+                  : 'text-amber-400'
               }`}
             />
             <span className="hidden sm:inline font-bold">
@@ -614,7 +617,7 @@ export const App: React.FC = () => {
                 gpsErrorMsg
                   ? 'bg-rose-400 animate-pulse'
                   : currentGps
-                  ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400'
+                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
                   : 'bg-amber-400 animate-pulse'
               }`}
             />
@@ -630,7 +633,7 @@ export const App: React.FC = () => {
                 setIsFirebaseModalOpen(true);
               }
             }}
-            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+            className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
               !syncStatus.isOnline
                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
                 : syncStatus.pendingCount > 0
@@ -662,7 +665,7 @@ export const App: React.FC = () => {
                   : syncStatus.pendingCount > 0
                   ? 'bg-amber-400'
                   : isCloudConnected
-                  ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400'
+                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
                   : 'bg-slate-500'
               }`}
             />
@@ -672,7 +675,7 @@ export const App: React.FC = () => {
           {!isAppInstalled && (
             <button
               onClick={handleInstallApp}
-              className="h-9 px-2 sm:px-2.5 rounded-xl text-xs font-black flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md active:scale-95 transition-all"
+              className="h-9 px-2 sm:px-2.5 rounded-2xl text-xs font-black flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md active:scale-95 transition-all"
               title="홈 화면에 전체화면 앱으로 설치"
             >
               <Smartphone className="w-3.5 h-3.5 text-blue-200" />
@@ -683,7 +686,7 @@ export const App: React.FC = () => {
           {/* 역할 전환 버튼 */}
           <button
             onClick={() => setIsRoleSelectorOpen(true)}
-            className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+            className={`h-9 px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
               userRole === 'ADMIN'
                 ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30'
                 : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
@@ -712,43 +715,74 @@ export const App: React.FC = () => {
             <p className="font-bold text-sm">현장 배수로 지도를 불러오는 중입니다...</p>
           </div>
         ) : currentView === 'map' ? (
-          <MapView
-            ditches={ditches}
-            userRole={userRole}
-            selectedDitch={selectedDitch}
-            onSelectDitch={(ditch) => {
-              setSelectedDitch(ditch);
-              if (ditch) setSelectedAlert(null);
-            }}
-            onStartInspection={handleStartInspection}
-            onOpenInspectionForm={handleOpenInspectionForm}
-            onFastPassInspection={handleFastPassInspection}
-            onViewHistory={(ditch) => {
-              setSelectedDitch(ditch);
-              setIsHistoryOpen(true);
-            }}
-            onAddNewDitch={() => {
-              setEditingDitch(null);
-              setIsDitchEditOpen(true);
-            }}
-            onEditDitch={(ditch) => {
-              setEditingDitch(ditch);
-              setIsDitchEditOpen(true);
-            }}
-            onUpdateDitchCoordinates={handleUpdateDitchCoordinates}
-            currentGps={currentGps}
-            gpsErrorMsg={gpsErrorMsg}
-            onRetryGps={refreshGpsLocation}
-            alerts={alerts}
-            onCreateAlert={handleCreateAlert}
-            onDeleteAlert={handleDeleteAlert}
-            onUpdateAlert={handleUpdateAlert}
-            selectedAlert={selectedAlert}
-            onSelectAlert={(alert) => {
-              setSelectedAlert(alert);
-              if (alert) setSelectedDitch(null);
-            }}
-          />
+          <div className="flex-1 flex w-full h-full overflow-hidden relative">
+            {/* PC 관리자 전용: 좌측 macOS 스타일 실시간 시설 관제 사이드바 */}
+            {userRole === 'ADMIN' && (
+              <AdminSplitSidebar
+                ditches={ditches}
+                inspections={inspections}
+                selectedDitch={selectedDitch}
+                onSelectDitch={(ditch) => {
+                  setSelectedDitch(ditch);
+                  if (ditch) setSelectedAlert(null);
+                }}
+                alerts={alerts}
+                onOpenEdit={(ditch) => {
+                  setEditingDitch(ditch);
+                  setIsDitchEditOpen(true);
+                }}
+                onOpenHistory={(ditch) => {
+                  setSelectedDitch(ditch);
+                  setIsHistoryOpen(true);
+                }}
+                onAddNewDitch={() => {
+                  setEditingDitch(null);
+                  setIsDitchEditOpen(true);
+                }}
+                onOpenComprehensiveReport={() => setIsComprehensiveReportOpen(true)}
+              />
+            )}
+
+            <div className="flex-1 h-full relative overflow-hidden">
+              <MapView
+                ditches={ditches}
+                userRole={userRole}
+                selectedDitch={selectedDitch}
+                onSelectDitch={(ditch) => {
+                  setSelectedDitch(ditch);
+                  if (ditch) setSelectedAlert(null);
+                }}
+                onStartInspection={handleStartInspection}
+                onOpenInspectionForm={handleOpenInspectionForm}
+                onFastPassInspection={handleFastPassInspection}
+                onViewHistory={(ditch) => {
+                  setSelectedDitch(ditch);
+                  setIsHistoryOpen(true);
+                }}
+                onAddNewDitch={() => {
+                  setEditingDitch(null);
+                  setIsDitchEditOpen(true);
+                }}
+                onEditDitch={(ditch) => {
+                  setEditingDitch(ditch);
+                  setIsDitchEditOpen(true);
+                }}
+                onUpdateDitchCoordinates={handleUpdateDitchCoordinates}
+                currentGps={currentGps}
+                gpsErrorMsg={gpsErrorMsg}
+                onRetryGps={refreshGpsLocation}
+                alerts={alerts}
+                onCreateAlert={handleCreateAlert}
+                onDeleteAlert={handleDeleteAlert}
+                onUpdateAlert={handleUpdateAlert}
+                selectedAlert={selectedAlert}
+                onSelectAlert={(alert) => {
+                  setSelectedAlert(alert);
+                  if (alert) setSelectedDitch(null);
+                }}
+              />
+            </div>
+          </div>
         ) : (
           <AdminDashboard
             ditches={ditches}
@@ -854,6 +888,14 @@ export const App: React.FC = () => {
         onRetryGps={refreshGpsLocation}
         gpsErrorMsg={gpsErrorMsg}
         currentGps={currentGps}
+      />
+
+      {/* I. 종합보고서 모달 (관리자 전용) */}
+      <ComprehensiveReportModal
+        isOpen={isComprehensiveReportOpen}
+        onClose={() => setIsComprehensiveReportOpen(false)}
+        ditches={ditches}
+        inspections={inspections}
       />
     </div>
   );
