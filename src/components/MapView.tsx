@@ -49,19 +49,6 @@ const triggerHaptic = (pattern: number | number[] = 15) => {
   }
 };
 
-// 두 지점 간 거리 계산 (Haversine 공식, 단위: 미터)
-function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
 interface MapViewProps {
   ditches: DitchMaster[];
   userRole: UserRole;
@@ -122,53 +109,6 @@ export const MapView: React.FC<MapViewProps> = ({
   // ⚡ 3초 패스트패스 완료 피드백 상태 및 진행 중 상태
   const [isFastPassing, setIsFastPassing] = useState<boolean>(false);
   const [fastPassSuccessDitch, setFastPassSuccessDitch] = useState<DitchMaster | null>(null);
-
-  // 📍 GPS 기준 최단거리 배수로 스마트 계산 (미점검 시설 우선 추천)
-  const nearestDitchInfo = React.useMemo(() => {
-    if (ditches.length === 0) return null;
-
-    // 1차적으로 미점검 및 장기미점검 배수로 우선 대상
-    const pendingDitches = ditches.filter(
-      (d) => !d.lastInspectedAt || d.lastInspectedAt === '미점검' || getDitchOverdueInfo(d, 14).isOverdue
-    );
-    const targetPool = pendingDitches.length > 0 ? pendingDitches : ditches;
-
-    if (currentGps) {
-      let closestDitch: DitchMaster | null = null;
-      let minDistance = Infinity;
-
-      for (const ditch of targetPool) {
-        const dist = getDistanceMeters(
-          currentGps.latitude,
-          currentGps.longitude,
-          ditch.latitude,
-          ditch.longitude
-        );
-        if (dist < minDistance) {
-          minDistance = dist;
-          closestDitch = ditch;
-        }
-      }
-
-      if (closestDitch) {
-        return {
-          ditch: closestDitch,
-          distanceMeters: Math.round(minDistance),
-          isPendingOnly: pendingDitches.length > 0,
-        };
-      }
-    } else {
-      const fallbackDitch = targetPool[0];
-      if (fallbackDitch) {
-        return {
-          ditch: fallbackDitch,
-          distanceMeters: null,
-          isPendingOnly: pendingDitches.length > 0,
-        };
-      }
-    }
-    return null;
-  }, [ditches, currentGps]);
 
   // ⚡ 3초 원터치 패스트패스 실행 (Apple Pay 스타일 햅틱 + 모달 피드백)
   const handlePerformFastPass = async (targetDitch: DitchMaster) => {
@@ -1087,91 +1027,6 @@ export const MapView: React.FC<MapViewProps> = ({
           현장 배수로 등록
         </button>
       )}
-
-      {/* 🍏 Apple Maps 스타일: 가장 가까운 배수로 스마트 자동 추천 카드 (주사님 모드) */}
-      {userRole === 'INSPECTOR' &&
-        viewMode === 'map' &&
-        !selectedDitch &&
-        !selectedAlert &&
-        nearestDitchInfo && (
-          <div className="absolute bottom-4 sm:bottom-6 inset-x-3 sm:inset-x-auto sm:right-6 sm:w-96 z-20 pointer-events-auto animate-in slide-in-from-bottom duration-300">
-            <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-4 sm:p-5 shadow-2xl text-white space-y-3">
-              {/* 상단 거리 & 배지 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-2.5 w-2.5 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-xs font-black text-emerald-400">
-                    {nearestDitchInfo.distanceMeters !== null
-                      ? `📍 현재 위치에서 약 ${nearestDitchInfo.distanceMeters}m (최단거리)`
-                      : '📍 다음 점검 추천 배수로'}
-                  </span>
-                </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-slate-300">
-                  {nearestDitchInfo.ditch.code.replace(/(주차장|도로)/g, '정자 앞')}
-                </span>
-              </div>
-
-              {/* 배수로 명칭 및 상태 */}
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <h4 className="text-lg font-black text-white tracking-tight">
-                    {nearestDitchInfo.ditch.name}
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {(nearestDitchInfo.ditch.address || nearestDitchInfo.ditch.section || '야외 배수로 시설물').replace(/(주차장|도로)/g, '정자 앞')}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic(10);
-                    onSelectDitch(nearestDitchInfo.ditch);
-                    if (mapRef.current) {
-                      mapRef.current.flyTo(
-                        [nearestDitchInfo.ditch.latitude, nearestDitchInfo.ditch.longitude],
-                        19,
-                        { duration: 0.8 }
-                      );
-                    }
-                  }}
-                  className="text-xs font-bold text-blue-400 hover:text-blue-300 underline underline-offset-4"
-                >
-                  위치 보기
-                </button>
-              </div>
-
-              {/* ⚡ 3초 원터치 완료 대형 버튼 */}
-              <div className="pt-1 flex gap-2">
-                <button
-                  type="button"
-                  disabled={isFastPassing}
-                  onClick={() => handlePerformFastPass(nearestDitchInfo.ditch)}
-                  className="flex-1 h-13 sm:h-14 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 active:scale-95 transition-all"
-                >
-                  <Zap className="w-5 h-5 text-slate-950 fill-current" />
-                  <span>{isFastPassing ? '저장 중...' : '⚡ 3초 원터치 완료'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic(10);
-                    if (onOpenInspectionForm) {
-                      onOpenInspectionForm(nearestDitchInfo.ditch);
-                    } else {
-                      onStartInspection(nearestDitchInfo.ditch);
-                    }
-                  }}
-                  className="px-4 h-13 sm:h-14 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-2xl flex items-center justify-center border border-white/10 active:scale-95 transition-all"
-                >
-                  상세 점검
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
       {/* 🚨 긴급상황 경광등 핀 상세 및 해제 시트 */}
       {selectedAlert && (
