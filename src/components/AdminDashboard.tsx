@@ -33,6 +33,7 @@ import { exportAllDataJson, importAllDataJson, resetToDefaultData } from '../ser
 import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { PrintReportModal } from './PrintReportModal';
 import { ComprehensiveReportModal } from './ComprehensiveReportModal';
+import { DailyInspectionLogView } from './DailyInspectionLogView';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 import {
   SECTION_COLOR_CONFIG,
@@ -57,6 +58,7 @@ interface AdminDashboardProps {
   onDeleteDitch?: (ditchId: string) => Promise<void>;
   onDeleteAlert?: (alertId: string) => Promise<void>;
   onUpdateAlert?: (alert: EmergencyAlert) => Promise<void> | void;
+  onDeleteInspection?: (inspectionId: string) => Promise<void> | void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -71,7 +73,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteDitch,
   onDeleteAlert,
   onUpdateAlert,
+  onDeleteInspection,
 }) => {
+  // 뷰 모드 상태: 시설물 대장 관리 vs 일자별 점검 일지
+  const [dashboardView, setDashboardView] = useState<'DITCHES' | 'DAILY_LOG'>('DITCHES');
+
   // 필터 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | DrainStatus>('ALL');
@@ -600,8 +606,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* 3. ZONE 2: 원-라인 통합 컨트롤 툴바 (검색 + 구역/상태 필터 + 보고서/엑셀/백업/복원) */}
-      <div className="bg-slate-900 border border-slate-800 p-3 sm:p-3.5 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow">
+      {/* 2-1. 메인 뷰 모드 전환 탭: 배수로 시설물 대장 vs 일자별 점검 일지 */}
+      <div className="flex bg-slate-900 border border-slate-800 p-1.5 rounded-2xl shadow-sm">
+        <button
+          type="button"
+          onClick={() => setDashboardView('DITCHES')}
+          className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-98 ${
+            dashboardView === 'DITCHES'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" />
+          <span>배수로 시설물 종합 대장 ({ditches.length}개소)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setDashboardView('DAILY_LOG')}
+          className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-98 relative ${
+            dashboardView === 'DAILY_LOG'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>일자별 점검 일지 & 기록 ({inspections.length}건)</span>
+          {inspections.some((i) => i.inspectedAt?.startsWith(new Date().toISOString().slice(0, 10))) && (
+            <span
+              className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5"
+              title="오늘 점검 기록 있음"
+            />
+          )}
+        </button>
+      </div>
+
+      {dashboardView === 'DAILY_LOG' ? (
+        <DailyInspectionLogView
+          ditches={ditches}
+          inspections={inspections}
+          onSelectDitchOnMap={onSelectDitchOnMap}
+          onOpenHistory={onOpenHistory}
+          onPrintInspection={(ditch, inspection) => setActivePrintTarget({ ditch, inspection })}
+          onDeleteInspection={onDeleteInspection}
+        />
+      ) : (
+        <>
+          {/* 3. ZONE 2: 원-라인 통합 컨트롤 툴바 (검색 + 구역/상태 필터 + 보고서/엑셀/백업/복원) */}
+          <div className="bg-slate-900 border border-slate-800 p-3 sm:p-3.5 rounded-2xl flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow">
         {/* 좌측: 검색 & 드롭다운 필터 */}
         <div className="flex flex-1 flex-wrap items-center gap-2">
           {/* 검색창 */}
@@ -1025,6 +1076,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* 사진대지 인쇄 팝업 모달 */}
       {activePrintTarget && (

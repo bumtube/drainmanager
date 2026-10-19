@@ -13,6 +13,7 @@ import {
   X,
   Navigation,
   CheckCircle2,
+  Calendar,
 } from 'lucide-react';
 import { precacheFacilityMapTiles } from './services/mapTilePrecache';
 import { DitchMaster, InspectionRecord, UserSession, EmergencyAlert } from './types';
@@ -46,6 +47,8 @@ import { QuickInspectionForm } from './components/QuickInspectionForm';
 import { InspectionHistoryModal } from './components/InspectionHistoryModal';
 import { DitchEditModal } from './components/DitchEditModal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { DailyInspectionLogView } from './components/DailyInspectionLogView';
+import { PrintReportModal } from './components/PrintReportModal';
 import { RoleSelector } from './components/RoleSelector';
 import { FirebaseModal } from './components/FirebaseModal';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
@@ -71,8 +74,13 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
-  // 3. 네비게이션 뷰: 'map' | 'dashboard'
-  const [currentView, setCurrentView] = useState<'map' | 'dashboard'>('map');
+  // 3. 네비게이션 뷰: 'map' | 'dashboard' | 'daily_log'
+  const [currentView, setCurrentView] = useState<'map' | 'dashboard' | 'daily_log'>('map');
+  const [isDailyLogModalOpen, setIsDailyLogModalOpen] = useState<boolean>(false);
+  const [activePrintTarget, setActivePrintTarget] = useState<{
+    ditch: DitchMaster;
+    inspection: InspectionRecord;
+  } | null>(null);
 
   // 4. 지도 선택 배수로 및 긴급상황 경광등
   const [selectedDitch, setSelectedDitch] = useState<DitchMaster | null>(null);
@@ -527,7 +535,7 @@ export const App: React.FC = () => {
           </div>
         </button>
 
-        {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 전환 - Apple Segmented Control) */}
+        {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 vs 일자별 점검일지 전환 - Apple Segmented Control) */}
         {userRole === 'ADMIN' && (
           <div className="flex bg-slate-950/80 p-1 rounded-2xl border border-white/10 shadow-inner">
             <button
@@ -553,6 +561,16 @@ export const App: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" />
               )}
             </button>
+            <button
+              onClick={() => setCurrentView('daily_log')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 ${
+                currentView === 'daily_log'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" /> <span className="hidden sm:inline">일자별</span>점검일지
+            </button>
           </div>
         )}
 
@@ -561,7 +579,7 @@ export const App: React.FC = () => {
           {userRole === 'INSPECTOR' ? (
             /* 🍎 Apple Dynamic Status Capsule (주사님 모드: 극강의 심플 3-캡슐 UI) */
             <>
-              {/* 1. 오늘 점검 진행률 캡슐 (Today's Progress) */}
+              {/* 1. 오늘 점검 진행률 캡슐 (클릭 시 일자별 점검 일지 팝업) */}
               {(() => {
                 const todayStr = new Date().toISOString().slice(0, 10);
                 const total = ditches.length;
@@ -570,9 +588,11 @@ export const App: React.FC = () => {
                 ).length;
                 const pct = total > 0 ? Math.round((doneToday / total) * 100) : 0;
                 return (
-                  <div
-                    className="h-9 px-2.5 sm:px-3 rounded-full text-xs font-black flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shadow-sm backdrop-blur-xl"
-                    title={`오늘 총 ${total}개소 중 ${doneToday}개소 점검 완료 (${pct}%)`}
+                  <button
+                    type="button"
+                    onClick={() => setIsDailyLogModalOpen(true)}
+                    className="h-9 px-2.5 sm:px-3 rounded-full text-xs font-black flex items-center gap-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 shadow-sm backdrop-blur-xl active:scale-95 transition-all cursor-pointer"
+                    title={`오늘 총 ${total}개소 중 ${doneToday}개소 점검 완료 (${pct}%) - 클릭 시 일자별 점검 내용 조회`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
                     <span className="hidden sm:inline">오늘 완료</span>
@@ -580,7 +600,7 @@ export const App: React.FC = () => {
                       {doneToday}/{total}
                     </span>
                     <span className="text-[10px] text-emerald-400/90 font-bold hidden xs:inline">({pct}%)</span>
-                  </div>
+                  </button>
                 );
               })()}
 
@@ -876,7 +896,7 @@ export const App: React.FC = () => {
               />
             </div>
           </div>
-        ) : (
+        ) : currentView === 'dashboard' ? (
           <AdminDashboard
             ditches={ditches}
             inspections={inspections}
@@ -895,6 +915,19 @@ export const App: React.FC = () => {
             onDeleteDitch={handleDeleteDitch}
             onDeleteAlert={handleDeleteAlert}
             onUpdateAlert={handleUpdateAlert}
+            onDeleteInspection={handleDeleteInspection}
+          />
+        ) : (
+          <DailyInspectionLogView
+            ditches={ditches}
+            inspections={inspections}
+            onSelectDitchOnMap={handleSelectDitchOnMap}
+            onOpenHistory={(ditch) => {
+              setSelectedDitch(ditch);
+              setIsHistoryOpen(true);
+            }}
+            onPrintInspection={(ditch, inspection) => setActivePrintTarget({ ditch, inspection })}
+            onDeleteInspection={handleDeleteInspection}
           />
         )}
       </main>
@@ -995,6 +1028,36 @@ export const App: React.FC = () => {
         inspections={inspections}
         onGoHome={handleGoHome}
       />
+
+      {/* J. 일자별 점검 일지 팝업 모달 */}
+      {isDailyLogModalOpen && (
+        <DailyInspectionLogView
+          ditches={ditches}
+          inspections={inspections}
+          isModal
+          onClose={() => setIsDailyLogModalOpen(false)}
+          onSelectDitchOnMap={(ditch) => {
+            setIsDailyLogModalOpen(false);
+            handleSelectDitchOnMap(ditch);
+          }}
+          onOpenHistory={(ditch) => {
+            setIsDailyLogModalOpen(false);
+            setSelectedDitch(ditch);
+            setIsHistoryOpen(true);
+          }}
+          onPrintInspection={(ditch, inspection) => setActivePrintTarget({ ditch, inspection })}
+          onDeleteInspection={handleDeleteInspection}
+        />
+      )}
+
+      {/* K. 사진대지 인쇄 팝업 모달 */}
+      {activePrintTarget && (
+        <PrintReportModal
+          ditch={activePrintTarget.ditch}
+          inspection={activePrintTarget.inspection}
+          onClose={() => setActivePrintTarget(null)}
+        />
+      )}
     </div>
   );
 };
