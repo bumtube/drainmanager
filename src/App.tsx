@@ -494,10 +494,7 @@ export const App: React.FC = () => {
           </div>
           <div className="leading-tight">
             <h1 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center gap-1.5">
-              배수로 지킴이
-              <span className="text-[10px] text-emerald-400 font-bold hidden sm:inline">
-                Drainage Master
-              </span>
+              주택전시관
             </h1>
           </div>
         </button>

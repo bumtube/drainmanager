@@ -50,7 +50,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
       <div className="bg-slate-900 border border-slate-700 text-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
         <div className="text-center mb-6">
           <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full mb-2">
-            DRAINAGE MASTER
+            주택전시관 배수시설 관리
           </span>
           <h2 className="text-2xl font-black tracking-tight text-white">현장 점검자 / 역할 선택</h2>
           <p className="text-sm text-slate-400 mt-1">
