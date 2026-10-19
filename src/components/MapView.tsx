@@ -27,6 +27,7 @@ import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
 import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
+import { extractDitchNumberStr } from '../utils/ditchNumber';
 
 
 interface MapViewProps {
@@ -238,9 +239,8 @@ export const MapView: React.FC<MapViewProps> = ({
       ? `<span class="absolute -top-1.5 -left-1.5 w-4 h-4 bg-amber-500 border border-white text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow animate-pulse z-10" title="장기 미점검 (${overdueInfo.daysElapsed === 999 ? '미점검' : `${overdueInfo.daysElapsed}일 경과`})">⚠️</span>`
       : '';
 
-    // 배수로 명칭에서 번호(숫자) 추출 (예: '정자 앞-1' -> '1', '본관-2' -> '2', '식수-3' -> '3')
-    const match = ditch.name?.match(/\d+/);
-    const ditchNumber = match ? match[0] : (ditch.name || '1');
+    // 배수로 명칭 및 코드에서 시설 고유 일련번호 추출 ('4층', '3층' 등 층수 숫자 오인 방지)
+    const ditchNumber = extractDitchNumberStr(ditch.name, ditch.code);
 
     // 4. 핀 머리 위 미니 구역 꼬리표 라벨 스타일
     const badgeStyle = secTheme.badgeStyle;

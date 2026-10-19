@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, Save, Trash2, Navigation, Check, Plus, Minus } from 'lucide-react';
 import { DitchMaster, DrainStatus } from '../types';
 import { getSectionTheme } from '../utils/sectionTheme';
+import { extractDitchNumber } from '../utils/ditchNumber';
 
 interface DitchEditModalProps {
   ditch: DitchMaster | null; // null이면 신규 등록
@@ -42,18 +43,15 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
     const sameSection = existingDitches.filter((d) => d.section === sec);
     let maxNum = 0;
     sameSection.forEach((d) => {
-      const match = d.name.match(/\d+/);
-      if (match) {
-        const num = parseInt(match[0], 10);
-        if (num > maxNum) maxNum = num;
-      }
+      const num = extractDitchNumber(d.name, d.code);
+      if (num > maxNum) maxNum = num;
     });
     return maxNum + 1;
   };
 
   // 2. 번호 관리 (기존 번호 추출 or 다음 번호 자동 할당)
   const initialNumber = ditch
-    ? parseInt(ditch.name.match(/\d+/)?.[0] || '1', 10)
+    ? extractDitchNumber(ditch.name, ditch.code)
     : getNextNumberForSection(section);
 
   const [ditchNumber, setDitchNumber] = useState<number>(initialNumber);
