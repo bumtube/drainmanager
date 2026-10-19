@@ -28,6 +28,7 @@ import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
 import { extractDitchNumberStr } from '../utils/ditchNumber';
+import { GpsHelpModal } from './GpsHelpModal';
 
 
 interface MapViewProps {
@@ -667,50 +668,9 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* 1. Leaflet 지도 컨테이너 */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* 2. 상단 GPS 상태 정보 바 및 에러 경고 */}
+      {/* 2. 상단 조작 바 (일반/위성 지도 토글) */}
       <div className="absolute top-3 inset-x-3 z-10 pointer-events-none flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              if (onRetryGps) onRetryGps();
-              if (!currentGps || gpsErrorMsg) setShowGpsHelpModal(true);
-            }}
-            className={`pointer-events-auto bg-slate-950/90 backdrop-blur-md border rounded-xl px-3.5 py-2 shadow-xl flex items-center gap-2.5 transition-all active:scale-95 text-left ${
-              gpsErrorMsg
-                ? 'border-rose-500/80 bg-rose-950/40'
-                : currentGps
-                ? 'border-slate-700/80'
-                : 'border-amber-500/80 bg-amber-950/30'
-            }`}
-          >
-            <span
-              className={`w-3 h-3 rounded-full shrink-0 ${
-                gpsErrorMsg
-                  ? 'bg-rose-500 animate-bounce'
-                  : currentGps
-                  ? 'bg-emerald-400 animate-pulse'
-                  : 'bg-amber-400 animate-pulse'
-              }`}
-            />
-            <div>
-              <div className="text-[11px] font-black text-slate-200">
-                {gpsErrorMsg ? (
-                  <span className="text-rose-400 font-bold">GPS 권한 필요 (터치하여 안내보기)</span>
-                ) : currentGps ? (
-                  <>
-                    GPS 오차: <span className="text-emerald-400">{currentGps.accuracy?.toFixed(1) || '3.2'}m</span> - 양호
-                  </>
-                ) : (
-                  <span className="text-amber-400">GPS 신호 수신 중... (터치 시 재시도)</span>
-                )}
-              </div>
-              <div className="text-[9px] text-slate-400">
-                {userRole === 'ADMIN' ? '🔑 관리자 모드 (핀 이동 가능)' : '🔒 주사님 모드 (위치 고정)'}
-              </div>
-            </div>
-          </button>
-
+        <div className="flex items-center justify-end">
           {/* 일반/위성 지도 토글 버튼 */}
           <button
             onClick={() => setMapType((prev) => (prev === 'streets' ? 'satellite' : 'streets'))}
@@ -1400,74 +1360,13 @@ export const MapView: React.FC<MapViewProps> = ({
       )}
 
       {/* 6. GPS 문제 해결 안내 모달 */}
-      {showGpsHelpModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 text-white shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Navigation className="w-5 h-5 text-amber-400" />
-                <h3 className="font-black text-base">GPS 위치 수신 가이드</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGpsHelpModal(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
-              <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 space-y-1">
-                <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <span>1.</span> 브라우저 위치 권한 허용 (★가장 중요)
-                </div>
-                <p className="text-slate-400">
-                  스마트폰 주소창 왼쪽의 <b>자물쇠(🔒)</b> 아이콘을 누르고, <b>[권한] ➜ [위치]</b>를 <b>'허용'</b>으로 바꿔주세요.
-                </p>
-              </div>
-
-              <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 space-y-1">
-                <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <span>2.</span> 카카오톡으로 열었을 때
-                </div>
-                <p className="text-slate-400">
-                  카카오톡 내부는 GPS가 차단됩니다. 화면 오른쪽 아래 <b>점 3개(⋮)</b>를 눌러 <b>[다른 브라우저로 열기]</b>(크롬/사파리)를 누르세요.
-                </p>
-              </div>
-
-              <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 space-y-1">
-                <div className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <span>3.</span> 스마트폰 자체 '위치' 켜기 & 실외 이동
-                </div>
-                <p className="text-slate-400">
-                  스마트폰 상단바를 내려 <b>'위치'</b>가 켜져 있는지 확인하세요. 콘크리트 실내에서는 GPS 위성이 안 잡히므로 창가나 야외 현장으로 나가시면 바로 잡힙니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowGpsHelpModal(false)}
-                className="flex-1 h-12 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl"
-              >
-                닫기
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowGpsHelpModal(false);
-                  if (onRetryGps) onRetryGps();
-                }}
-                className="flex-1 h-12 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg"
-              >
-                GPS 다시 시도하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <GpsHelpModal
+        isOpen={showGpsHelpModal}
+        onClose={() => setShowGpsHelpModal(false)}
+        onRetryGps={onRetryGps}
+        gpsErrorMsg={gpsErrorMsg}
+        currentGps={currentGps}
+      />
 
       {/* 6. 긴급상황 현장 사진 원본 확대보기 모달 */}
       {enlargedAlertPhoto && (

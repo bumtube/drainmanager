@@ -11,6 +11,7 @@ import {
   Smartphone,
   Download,
   X,
+  Navigation,
 } from 'lucide-react';
 import { precacheFacilityMapTiles } from './services/mapTilePrecache';
 import { DitchMaster, InspectionRecord, UserSession, EmergencyAlert } from './types';
@@ -47,6 +48,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { RoleSelector } from './components/RoleSelector';
 import { FirebaseModal } from './components/FirebaseModal';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
+import { GpsHelpModal } from './components/GpsHelpModal';
 import {
   subscribeToSyncStatus,
   getCurrentSyncStatus,
@@ -80,6 +82,7 @@ export const App: React.FC = () => {
   const [editingDitch, setEditingDitch] = useState<DitchMaster | null>(null);
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState<boolean>(false);
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState<boolean>(false);
+  const [isGpsHelpModalOpen, setIsGpsHelpModalOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getCurrentSyncStatus());
 
   // 점검 진행 중 임시 사진 및 GPS
@@ -575,6 +578,51 @@ export const App: React.FC = () => {
             </button>
           )}
 
+          {/* GPS 상태 뱃지 버튼 (실시간 공유중 창 왼쪽, 반응형 콤팩트 적용) */}
+          <button
+            type="button"
+            onClick={() => {
+              refreshGpsLocation();
+              setIsGpsHelpModalOpen(true);
+            }}
+            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+              gpsErrorMsg
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
+                : currentGps
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+            }`}
+            title={
+              gpsErrorMsg
+                ? 'GPS 권한 필요 (클릭 시 가이드 및 재시도)'
+                : currentGps
+                ? `GPS 정상 수신 (오차 ${currentGps.accuracy ? currentGps.accuracy.toFixed(1) + 'm' : '양호'}, 클릭 시 가이드)`
+                : 'GPS 신호 수신 중... (클릭 시 가이드 및 재시도)'
+            }
+          >
+            <Navigation
+              className={`w-4 h-4 shrink-0 ${
+                gpsErrorMsg
+                  ? 'text-rose-400 animate-bounce'
+                  : currentGps
+                  ? 'text-emerald-400'
+                  : 'text-amber-400 animate-spin'
+              }`}
+            />
+            <span className="hidden sm:inline font-bold">
+              {gpsErrorMsg ? 'GPS 권한 필요' : currentGps ? 'GPS 정상' : 'GPS 수신중'}
+            </span>
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                gpsErrorMsg
+                  ? 'bg-rose-400 animate-pulse'
+                  : currentGps
+                  ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400'
+                  : 'bg-amber-400 animate-pulse'
+              }`}
+            />
+          </button>
+
           {/* 클라우드 실시간 동기화 상태 뱃지 & 버튼 */}
           {/* 주사님 모드: 클릭 시 Firebase 설정 대신 붙임2(오프라인&동기화 관리) 모달이 열림 */}
           <button
@@ -800,6 +848,15 @@ export const App: React.FC = () => {
           await loadData();
           return res;
         }}
+      />
+
+      {/* H. GPS 문제 해결 안내 모달 */}
+      <GpsHelpModal
+        isOpen={isGpsHelpModalOpen}
+        onClose={() => setIsGpsHelpModalOpen(false)}
+        onRetryGps={refreshGpsLocation}
+        gpsErrorMsg={gpsErrorMsg}
+        currentGps={currentGps}
       />
     </div>
   );
