@@ -916,6 +916,7 @@ export const App: React.FC = () => {
             onDeleteAlert={handleDeleteAlert}
             onUpdateAlert={handleUpdateAlert}
             onDeleteInspection={handleDeleteInspection}
+            onSaveDitch={handleSaveDitch}
           />
         ) : (
           <DailyInspectionLogView
