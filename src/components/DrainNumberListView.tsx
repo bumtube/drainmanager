@@ -165,45 +165,96 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
     >
       {/* 1. 상단 컨트롤 바 (고정 헤더) */}
       <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-900/90 border-b border-white/10 p-3 space-y-2.5 shadow-lg">
-        {/* 상단 타이틀 & 지도 뷰 전환 버튼 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-            </span>
-            <div>
-              <div className="flex items-center gap-1.5">
-                {onGoHome && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic(10);
-                        onGoHome();
-                      }}
-                      className="text-xs font-black text-emerald-400 hover:text-emerald-300 underline cursor-pointer active:scale-95 transition-all"
-                      title="최초 접속페이지(지도)로 이동"
-                    >
-                      주택전시관
-                    </button>
-                    <span className="text-slate-500 text-xs font-bold">/</span>
-                  </>
-                )}
-                <h2 className="text-base font-black text-white flex items-center gap-1.5">
-                  <span>배수로 번호 순번 점검</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {filteredAndSortedDitches.length}개소
+        {/* 상단 컨트롤 바: 구역 필터 & 우측 3-way [일반지도 | 위성지도 | 목록 뷰] 세그먼트 */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          {/* 구역 선택 필터 (3열 2행 모바일 그리드 / PC 1열) */}
+          <div className="order-2 sm:order-1 grid grid-cols-3 sm:flex sm:items-center gap-1.5 py-0.5">
+            {/* 전체 버튼 */}
+            {(() => {
+              const isAllSelected = selectedSections.length === ALL_SECTIONS.length;
+              const allTheme = SECTION_COLOR_CONFIG['전체'];
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    if (isAllSelected) {
+                      onClearSections();
+                    } else {
+                      onSelectAllSections();
+                    }
+                  }}
+                  className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
+                    isAllSelected
+                      ? allTheme.btnActive
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                  }`}
+                >
+                  <span>전체</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-black/40">
+                    {ditches.length}
                   </span>
-                </h2>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                지도를 보지 않고 번호 순서대로 즉시 점검할 수 있습니다.
-              </p>
-            </div>
+                </button>
+              );
+            })()}
+
+            {/* 개별 5개 구역 */}
+            {ALL_SECTIONS.map((sec) => {
+              const isSelected = selectedSections.includes(sec);
+              const count = ditches.filter((d) => getNormalizedSection(d) === sec).length;
+              const theme = SECTION_COLOR_CONFIG[sec];
+              return (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    onSelectSection(sec);
+                  }}
+                  className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
+                    isSelected
+                      ? theme.btnActive
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                  }`}
+                >
+                  <span>{sec}</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-black/40">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* ⚠️ 14일 경과 시설물 전용 필터 칩 */}
+            {(() => {
+              const overdueCount = ditches.filter((d) => getOverdueStatus(d, 14).isOverdue).length;
+              if (overdueCount === 0) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    setOnlyOverdue((prev) => !prev);
+                  }}
+                  className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
+                    onlyOverdue
+                      ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-950/80 ring-2 ring-amber-400/40'
+                      : 'bg-amber-950/30 text-amber-300 border-amber-500/30 hover:bg-amber-900/40'
+                  }`}
+                  title="14일 이상 점검하지 않은 장기미점검 시설물만 보기"
+                >
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>14일 경과</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-amber-950 text-amber-200">
+                    {overdueCount}
+                  </span>
+                </button>
+              );
+            })()}
           </div>
 
           {/* 우측 상단: Apple 스타일 3-way 세그먼트 컨트롤 [일반지도 | 위성지도 | 목록 뷰] */}
-          <div className="bg-slate-950/85 backdrop-blur-md p-1 rounded-2xl border border-white/10 flex items-center gap-1 shadow-xl shrink-0">
+          <div className="order-1 sm:order-2 self-end sm:self-auto bg-slate-950/85 backdrop-blur-md p-1 rounded-2xl border border-white/10 flex items-center gap-1 shadow-xl shrink-0">
             {/* 1. 일반지도 */}
             <button
               type="button"
@@ -245,92 +296,6 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
               <span className="sm:hidden">목록</span>
             </button>
           </div>
-        </div>
-
-        {/* 2. 구역 선택 필터 (3열 2행 모바일 그리드) */}
-        <div className="grid grid-cols-3 sm:flex sm:items-center gap-1.5 py-0.5">
-          {/* 전체 버튼 */}
-          {(() => {
-            const isAllSelected = selectedSections.length === ALL_SECTIONS.length;
-            const allTheme = SECTION_COLOR_CONFIG['전체'];
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic(10);
-                  if (isAllSelected) {
-                    onClearSections();
-                  } else {
-                    onSelectAllSections();
-                  }
-                }}
-                className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
-                  isAllSelected
-                    ? allTheme.btnActive
-                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-                }`}
-              >
-                <span>전체</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-black/40">
-                  {ditches.length}
-                </span>
-              </button>
-            );
-          })()}
-
-          {/* 개별 5개 구역 */}
-          {ALL_SECTIONS.map((sec) => {
-            const isSelected = selectedSections.includes(sec);
-            const count = ditches.filter((d) => getNormalizedSection(d) === sec).length;
-            const theme = SECTION_COLOR_CONFIG[sec];
-            return (
-              <button
-                key={sec}
-                type="button"
-                onClick={() => {
-                  triggerHaptic(10);
-                  onSelectSection(sec);
-                }}
-                className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
-                  isSelected
-                    ? theme.btnActive
-                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-                }`}
-              >
-                <span>{sec}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-black/40">
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-
-          {/* ⚠️ 14일 경과 시설물 전용 필터 칩 */}
-          {(() => {
-            const overdueCount = ditches.filter((d) => getOverdueStatus(d, 14).isOverdue).length;
-            if (overdueCount === 0) return null;
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic(10);
-                  setOnlyOverdue((prev) => !prev);
-                }}
-                className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
-                  onlyOverdue
-                    ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-950/80 ring-2 ring-amber-400/40'
-                    : 'bg-amber-950/30 text-amber-300 border-amber-500/30 hover:bg-amber-900/40'
-                }`}
-                title="14일 이상 점검하지 않은 장기미점검 시설물만 보기"
-              >
-                <AlertTriangle className="w-3 h-3 text-amber-400" />
-                <span>14일 경과</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-amber-950 text-amber-200">
-                  {overdueCount}
-                </span>
-              </button>
-            );
-          })()}
         </div>
 
         {/* 4. 🔢 퀵 번호 다이얼 바 (1번, 2번, 3번... 원터치 점프) */}
