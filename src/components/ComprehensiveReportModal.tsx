@@ -204,7 +204,7 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
               배수시설 유지관리 {reportType === 'weekly' ? '주간' : '월간'} 종합보고서
             </h1>
             <p className="text-[11px] text-gray-600 mt-1 font-medium">
-              성남시 분당구 불정로 50 (분당노인종합복지관) 배수시설 종합 안전점검
+              성남시 분당구 불정로 50 (주택전시관) 배수시설 종합 안전점검
             </p>
             <div className="text-[11px] font-bold text-blue-900 mt-1">
               점검 대상 기간: {startDateStr} ~ {endDateStr} ({reportType === 'weekly' ? '7일간' : '30일간'})
@@ -430,7 +430,7 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
         {/* 하단 기관 날인 및 확인 */}
         <div className="mt-6 pt-3 border-t border-black flex justify-between items-center text-[11px] text-gray-700">
           <span>보고서 생성일시: {new Date().toLocaleString('ko-KR')}</span>
-          <span className="font-bold">분당노인종합복지관 시설안전관리팀 (직인생략)</span>
+          <span className="font-bold">주택전시관</span>
         </div>
       </div>
     </div>
