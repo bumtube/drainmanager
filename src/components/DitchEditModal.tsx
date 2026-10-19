@@ -64,8 +64,8 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
     }
   };
 
-  // 3. 현재 상태 (정상, 주의, 긴급)
-  const [currentStatus, setCurrentStatus] = useState<DrainStatus>(ditch?.currentStatus || 'GOOD');
+  // 3. 현재 상태 (기존 배수로 상태 유지, 신규 등록 시 기본 'GOOD')
+  const currentStatus: DrainStatus = ditch?.currentStatus || 'GOOD';
 
   // 4. 특이사항
   const [memo, setMemo] = useState(ditch?.memo || '');
@@ -234,50 +234,11 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
             </div>
           </div>
 
-          {/* 3. 현재 상태 원터치 선택 */}
-          <div>
-            <label className="block text-xs font-black text-white mb-2 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
-                3
-              </span>
-              현재 상태
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { value: 'GOOD', label: '정상', color: 'emerald' },
-                  { value: 'WARNING', label: '주의', color: 'amber' },
-                  { value: 'DANGER', label: '긴급', color: 'rose' },
-                ] as const
-              ).map((st) => {
-                const selected = currentStatus === st.value;
-                return (
-                  <button
-                    key={st.value}
-                    type="button"
-                    onClick={() => setCurrentStatus(st.value)}
-                    className={`min-h-[48px] rounded-xl font-black text-xs sm:text-sm border-2 transition-all flex items-center justify-center active:scale-95 ${
-                      selected
-                        ? st.color === 'emerald'
-                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg'
-                          : st.color === 'amber'
-                          ? 'bg-amber-600 border-amber-400 text-white shadow-lg'
-                          : 'bg-rose-600 border-rose-400 text-white shadow-lg'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750'
-                    }`}
-                  >
-                    {st.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 4. 특이사항 메모 */}
+          {/* 3. 특이사항 메모 */}
           <div>
             <label className="block text-xs font-black text-white mb-1.5 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 text-xs font-black flex items-center justify-center">
-                4
+                3
               </span>
               특이사항
             </label>
