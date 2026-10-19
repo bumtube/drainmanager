@@ -304,25 +304,33 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
               </button>
             );
           })}
-        </div>
 
-        {/* 3. 14일 경과 시설물 전용 필터 */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic(10);
-              setOnlyOverdue((prev) => !prev);
-            }}
-            className={`h-8 px-3 rounded-xl text-xs font-black border flex items-center gap-1.5 transition-all active:scale-95 ${
-              onlyOverdue
-                ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-950/80 ring-2 ring-amber-400/40'
-                : 'bg-white/5 text-amber-300 border-white/10 hover:bg-white/10'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>⚠️ 14일 경과 시설물만</span>
-          </button>
+          {/* ⚠️ 14일 경과 시설물 전용 필터 칩 */}
+          {(() => {
+            const overdueCount = ditches.filter((d) => getOverdueStatus(d, 14).isOverdue).length;
+            if (overdueCount === 0) return null;
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(10);
+                  setOnlyOverdue((prev) => !prev);
+                }}
+                className={`w-full sm:w-auto px-2 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 ${
+                  onlyOverdue
+                    ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-950/80 ring-2 ring-amber-400/40'
+                    : 'bg-amber-950/30 text-amber-300 border-amber-500/30 hover:bg-amber-900/40'
+                }`}
+                title="14일 이상 점검하지 않은 장기미점검 시설물만 보기"
+              >
+                <AlertTriangle className="w-3 h-3 text-amber-400" />
+                <span>14일 경과</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-amber-950 text-amber-200">
+                  {overdueCount}
+                </span>
+              </button>
+            );
+          })()}
         </div>
 
         {/* 4. 🔢 퀵 번호 다이얼 바 (1번, 2번, 3번... 원터치 점프) */}
