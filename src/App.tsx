@@ -555,179 +555,222 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* 우측 사용자 권한 뱃지 & 설정 버튼 */}
-        <div className="flex items-center gap-2">
-          {/* 관리자 모드 전용: 오프라인 보장 & 대기 큐 동기화 상태 뱃지 버튼 */}
-          {userRole === 'ADMIN' && (
-            <button
-              onClick={() => setIsOfflineModalOpen(true)}
-              className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
-                !syncStatus.isOnline
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
-                  : syncStatus.pendingCount > 0
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
-                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
-              }`}
-              title="오프라인 작동 및 동기화 상태 (클릭 시 상세 모달 및 즉시 동기화)"
-            >
-              <span className="relative flex h-2 w-2">
+        {/* 우측 사용자 권한 뱃지 & 설정 버튼 (주사님 모드 vs 관리자 모드 분기) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {userRole === 'INSPECTOR' ? (
+            /* 🍎 Apple Dynamic Status Capsule (주사님 모드: 극강의 심플 2-캡슐 UI) */
+            <>
+              {/* 1. 통합 상태 다이내믹 캡슐 (GPS & 동기화 상태 원터치 뷰) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (gpsErrorMsg) {
+                    setIsGpsHelpModalOpen(true);
+                  } else {
+                    setIsOfflineModalOpen(true);
+                  }
+                }}
+                className={`h-9 px-3 rounded-full text-xs font-black flex items-center gap-2 border transition-all active:scale-95 shadow-sm backdrop-blur-xl ${
+                  gpsErrorMsg || !syncStatus.isOnline
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
+                    : syncStatus.pendingCount > 0
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                }`}
+                title="현장 GPS 및 동기화 상태 (클릭 시 상세 안내 및 동기화)"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      gpsErrorMsg || !syncStatus.isOnline
+                        ? 'bg-rose-400'
+                        : syncStatus.pendingCount > 0
+                        ? 'bg-amber-400'
+                        : 'bg-emerald-400'
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      gpsErrorMsg || !syncStatus.isOnline
+                        ? 'bg-rose-500'
+                        : syncStatus.pendingCount > 0
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-400'
+                    }`}
+                  />
+                </span>
+                <span className="font-bold text-xs">
+                  {gpsErrorMsg
+                    ? 'GPS 권한 필요'
+                    : !syncStatus.isOnline
+                    ? '오프라인 보장'
+                    : syncStatus.pendingCount > 0
+                    ? `대기 ${syncStatus.pendingCount}건`
+                    : '점검 준비완료'}
+                </span>
+              </button>
+
+              {/* 2. 주사님 프로필 캡슐 (원터치 역할 전환) */}
+              <button
+                type="button"
+                onClick={() => setIsRoleSelectorOpen(true)}
+                className="h-9 px-3 rounded-full text-xs font-black flex items-center gap-1.5 bg-white/10 hover:bg-white/15 text-white border border-white/15 active:scale-95 transition-all shadow"
+                title="점검자 프로필 및 전환"
+              >
+                <HardHat className="w-4 h-4 text-emerald-400" />
+                <span className="max-w-[75px] truncate">{session?.name || '현장점검'}</span>
+              </button>
+            </>
+          ) : (
+            /* 관리자 모드(ADMIN): 상세 관제 뱃지 및 설정 노출 */
+            <>
+              {/* 관리자 모드 전용: 오프라인 보장 & 대기 큐 동기화 상태 뱃지 버튼 */}
+              <button
+                onClick={() => setIsOfflineModalOpen(true)}
+                className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+                  !syncStatus.isOnline
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
+                    : syncStatus.pendingCount > 0
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+                }`}
+                title="오프라인 작동 및 동기화 상태 (클릭 시 상세 모달 및 즉시 동기화)"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      !syncStatus.isOnline
+                        ? 'bg-rose-400'
+                        : syncStatus.pendingCount > 0
+                        ? 'bg-amber-400'
+                        : 'bg-emerald-400'
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      !syncStatus.isOnline
+                        ? 'bg-rose-500'
+                        : syncStatus.pendingCount > 0
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-400'
+                    }`}
+                  />
+                </span>
+                <span className="font-bold text-xs">
+                  {!syncStatus.isOnline
+                    ? '오프라인'
+                    : syncStatus.isSyncing
+                    ? '동기화중...'
+                    : syncStatus.pendingCount > 0
+                    ? `대기 ${syncStatus.pendingCount}건`
+                    : '로컬보장'}
+                </span>
+              </button>
+
+              {/* GPS 상태 뱃지 버튼 */}
+              <button
+                type="button"
+                onClick={() => {
+                  refreshGpsLocation();
+                  setIsGpsHelpModalOpen(true);
+                }}
+                className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+                  gpsErrorMsg
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
+                    : currentGps
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                }`}
+                title={
+                  gpsErrorMsg
+                    ? 'GPS 권한 필요 (클릭 시 가이드 및 재시도)'
+                    : currentGps
+                    ? `GPS 정상 수신 (오차 ${currentGps.accuracy ? currentGps.accuracy.toFixed(1) + 'm' : '양호'}, 클릭 시 가이드)`
+                    : 'GPS 신호 수신 중... (클릭 시 가이드 및 재시도)'
+                }
+              >
+                <Navigation
+                  className={`w-4 h-4 shrink-0 ${
+                    gpsErrorMsg
+                      ? 'text-rose-400'
+                      : currentGps
+                      ? 'text-emerald-400'
+                      : 'text-amber-400'
+                  }`}
+                />
+                <span className="hidden sm:inline font-bold">
+                  {gpsErrorMsg ? 'GPS 권한 필요' : currentGps ? 'GPS 정상' : 'GPS 수신중'}
+                </span>
                 <span
-                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    gpsErrorMsg
+                      ? 'bg-rose-400 animate-pulse'
+                      : currentGps
+                      ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
+                      : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
+              </button>
+
+              {/* 클라우드 실시간 동기화 상태 뱃지 & 버튼 */}
+              <button
+                onClick={() => setIsFirebaseModalOpen(true)}
+                className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+                  !syncStatus.isOnline
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
+                    : syncStatus.pendingCount > 0
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                    : isCloudConnected
+                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                }`}
+                title="클라우드 실시간 동기화 상태 (클릭 시 Firebase & GitHub 배포 설정)"
+              >
+                <Cloud className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline font-bold">
+                  {!syncStatus.isOnline
+                    ? '오프라인'
+                    : syncStatus.pendingCount > 0
+                    ? `대기 ${syncStatus.pendingCount}건`
+                    : isCloudConnected
+                    ? '실시간 공유중'
+                    : '클라우드'}
+                </span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
                     !syncStatus.isOnline
                       ? 'bg-rose-400'
                       : syncStatus.pendingCount > 0
                       ? 'bg-amber-400'
-                      : 'bg-emerald-400'
+                      : isCloudConnected
+                      ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
+                      : 'bg-slate-500'
                   }`}
                 />
-                <span
-                  className={`relative inline-flex rounded-full h-2 w-2 ${
-                    !syncStatus.isOnline
-                      ? 'bg-rose-500'
-                      : syncStatus.pendingCount > 0
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-400'
-                  }`}
-                />
-              </span>
-              <span className="font-bold text-xs">
-                {!syncStatus.isOnline
-                  ? '오프라인'
-                  : syncStatus.isSyncing
-                  ? '동기화중...'
-                  : syncStatus.pendingCount > 0
-                  ? `대기 ${syncStatus.pendingCount}건`
-                  : '로컬보장'}
-              </span>
-            </button>
-          )}
+              </button>
 
-          {/* GPS 상태 뱃지 버튼 (실시간 공유중 창 왼쪽, 반응형 콤팩트 적용) */}
-          <button
-            type="button"
-            onClick={() => {
-              refreshGpsLocation();
-              setIsGpsHelpModalOpen(true);
-            }}
-            className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
-              gpsErrorMsg
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
-                : currentGps
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
-                : 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
-            }`}
-            title={
-              gpsErrorMsg
-                ? 'GPS 권한 필요 (클릭 시 가이드 및 재시도)'
-                : currentGps
-                ? `GPS 정상 수신 (오차 ${currentGps.accuracy ? currentGps.accuracy.toFixed(1) + 'm' : '양호'}, 클릭 시 가이드)`
-                : 'GPS 신호 수신 중... (클릭 시 가이드 및 재시도)'
-            }
-          >
-            <Navigation
-              className={`w-4 h-4 shrink-0 ${
-                gpsErrorMsg
-                  ? 'text-rose-400'
-                  : currentGps
-                  ? 'text-emerald-400'
-                  : 'text-amber-400'
-              }`}
-            />
-            <span className="hidden sm:inline font-bold">
-              {gpsErrorMsg ? 'GPS 권한 필요' : currentGps ? 'GPS 정상' : 'GPS 수신중'}
-            </span>
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                gpsErrorMsg
-                  ? 'bg-rose-400 animate-pulse'
-                  : currentGps
-                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
-                  : 'bg-amber-400 animate-pulse'
-              }`}
-            />
-          </button>
+              {/* PWA 앱 설치 버튼 (홈 화면 추가) */}
+              {!isAppInstalled && (
+                <button
+                  onClick={handleInstallApp}
+                  className="h-9 px-2 sm:px-2.5 rounded-2xl text-xs font-black flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md active:scale-95 transition-all"
+                  title="홈 화면에 전체화면 앱으로 설치"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-blue-200" />
+                  <span className="hidden sm:inline">앱 설치</span>
+                </button>
+              )}
 
-          {/* 클라우드 실시간 동기화 상태 뱃지 & 버튼 */}
-          {/* 주사님 모드: 클릭 시 Firebase 설정 대신 붙임2(오프라인&동기화 관리) 모달이 열림 */}
-          <button
-            onClick={() => {
-              if (userRole === 'INSPECTOR') {
-                setIsOfflineModalOpen(true);
-              } else {
-                setIsFirebaseModalOpen(true);
-              }
-            }}
-            className={`h-9 px-2.5 sm:px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
-              !syncStatus.isOnline
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
-                : syncStatus.pendingCount > 0
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
-                : isCloudConnected
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
-            }`}
-            title={
-              userRole === 'INSPECTOR'
-                ? '실시간 클라우드 공유 및 오프라인 상태 (클릭 시 동기화/캐시 관리)'
-                : '클라우드 실시간 동기화 상태 (클릭 시 Firebase & GitHub 배포 설정)'
-            }
-          >
-            <Cloud className="w-4 h-4 text-emerald-400" />
-            <span className="hidden sm:inline font-bold">
-              {!syncStatus.isOnline
-                ? '오프라인'
-                : syncStatus.pendingCount > 0
-                ? `대기 ${syncStatus.pendingCount}건`
-                : isCloudConnected
-                ? '실시간 공유중'
-                : '클라우드'}
-            </span>
-            <span
-              className={`w-2 h-2 rounded-full ${
-                !syncStatus.isOnline
-                  ? 'bg-rose-400'
-                  : syncStatus.pendingCount > 0
-                  ? 'bg-amber-400'
-                  : isCloudConnected
-                  ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
-                  : 'bg-slate-500'
-              }`}
-            />
-          </button>
-
-          {/* PWA 앱 설치 버튼 (홈 화면 추가) */}
-          {!isAppInstalled && (
-            <button
-              onClick={handleInstallApp}
-              className="h-9 px-2 sm:px-2.5 rounded-2xl text-xs font-black flex items-center gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md active:scale-95 transition-all"
-              title="홈 화면에 전체화면 앱으로 설치"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-blue-200" />
-              <span className="hidden sm:inline">앱 설치</span>
-            </button>
-          )}
-
-          {/* 역할 전환 버튼 */}
-          <button
-            onClick={() => setIsRoleSelectorOpen(true)}
-            className={`h-9 px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
-              userRole === 'ADMIN'
-                ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30'
-                : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30'
-            }`}
-          >
-            {userRole === 'ADMIN' ? (
-              <>
+              {/* 역할 전환 버튼 (관리자) */}
+              <button
+                onClick={() => setIsRoleSelectorOpen(true)}
+                className="h-9 px-3 rounded-2xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30"
+              >
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
                 <span className="hidden sm:inline">관리자</span>
-              </>
-            ) : (
-              <>
-                <HardHat className="w-4 h-4 text-emerald-400" />
-                <span className="max-w-[70px] truncate">{session?.name || '현장 점검'}</span>
-              </>
-            )}
-          </button>
+              </button>
+            </>
+          )}
         </div>
       </header>
 

@@ -49,6 +49,19 @@ const triggerHaptic = (pattern: number | number[] = 15) => {
   }
 };
 
+// 두 지점 간 거리 계산 (Haversine 공식, 단위: 미터)
+function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 interface MapViewProps {
   ditches: DitchMaster[];
   userRole: UserRole;
@@ -106,8 +119,80 @@ export const MapView: React.FC<MapViewProps> = ({
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userCircleRef = useRef<L.Circle | null>(null);
 
-  // ⚡ 5초 패스트패스 진행 중 상태
+  // ⚡ 3초 패스트패스 완료 피드백 상태 및 진행 중 상태
   const [isFastPassing, setIsFastPassing] = useState<boolean>(false);
+  const [fastPassSuccessDitch, setFastPassSuccessDitch] = useState<DitchMaster | null>(null);
+
+  // 📍 GPS 기준 최단거리 배수로 스마트 계산 (미점검 시설 우선 추천)
+  const nearestDitchInfo = React.useMemo(() => {
+    if (ditches.length === 0) return null;
+
+    // 1차적으로 미점검 및 장기미점검 배수로 우선 대상
+    const pendingDitches = ditches.filter(
+      (d) => !d.lastInspectedAt || d.lastInspectedAt === '미점검' || getDitchOverdueInfo(d, 14).isOverdue
+    );
+    const targetPool = pendingDitches.length > 0 ? pendingDitches : ditches;
+
+    if (currentGps) {
+      let closestDitch: DitchMaster | null = null;
+      let minDistance = Infinity;
+
+      for (const ditch of targetPool) {
+        const dist = getDistanceMeters(
+          currentGps.latitude,
+          currentGps.longitude,
+          ditch.latitude,
+          ditch.longitude
+        );
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestDitch = ditch;
+        }
+      }
+
+      if (closestDitch) {
+        return {
+          ditch: closestDitch,
+          distanceMeters: Math.round(minDistance),
+          isPendingOnly: pendingDitches.length > 0,
+        };
+      }
+    } else {
+      const fallbackDitch = targetPool[0];
+      if (fallbackDitch) {
+        return {
+          ditch: fallbackDitch,
+          distanceMeters: null,
+          isPendingOnly: pendingDitches.length > 0,
+        };
+      }
+    }
+    return null;
+  }, [ditches, currentGps]);
+
+  // ⚡ 3초 원터치 패스트패스 실행 (Apple Pay 스타일 햅틱 + 모달 피드백)
+  const handlePerformFastPass = async (targetDitch: DitchMaster) => {
+    if (!onFastPassInspection) return;
+    setIsFastPassing(true);
+    try {
+      triggerHaptic([30, 80, 40]);
+      await onFastPassInspection(targetDitch);
+      confetti({
+        particleCount: 70,
+        spread: 70,
+        origin: { y: 0.7 },
+      });
+      setFastPassSuccessDitch(targetDitch);
+      setTimeout(() => {
+        setFastPassSuccessDitch(null);
+      }, 1300);
+    } catch (err) {
+      console.error('Fast pass error:', err);
+      alert('점검 저장 중 문제가 발생했습니다.');
+    } finally {
+      setIsFastPassing(false);
+    }
+  };
 
   // 긴급상황 경광등 핀 선택 및 생성 로딩 상태
   const [internalSelectedAlert, setInternalSelectedAlert] = useState<EmergencyAlert | null>(null);
@@ -935,18 +1020,24 @@ export const MapView: React.FC<MapViewProps> = ({
       </div>
 
       {/* 3. 우측 컨트롤 버튼 (Apple Frosted Glass 스타일: 내 위치, 복지관 센터, 긴급 경광등) */}
-      <div className="absolute right-3 top-36 sm:top-24 z-10 flex flex-col gap-2">
+      <div className="absolute right-3 top-36 sm:top-24 z-10 flex flex-col gap-2.5">
         <button
-          onClick={handlePanToCurrentLocation}
-          className="w-11 h-11 bg-slate-900/80 hover:bg-slate-800 text-white rounded-2xl shadow-xl flex items-center justify-center border border-white/10 backdrop-blur-xl active:scale-95 transition-all"
+          onClick={() => {
+            triggerHaptic(10);
+            handlePanToCurrentLocation();
+          }}
+          className="w-12 h-12 rounded-full backdrop-blur-2xl bg-slate-900/85 hover:bg-slate-800 text-white border border-white/15 shadow-2xl flex items-center justify-center active:scale-90 transition-all"
           title="현재 내 위치로 이동"
         >
           <Navigation className="w-5 h-5 text-blue-400" />
         </button>
 
         <button
-          onClick={handlePanToFacilityCenter}
-          className="w-11 h-11 bg-slate-900/80 hover:bg-slate-800 text-white rounded-2xl shadow-xl flex items-center justify-center border border-white/10 backdrop-blur-xl active:scale-95 transition-all"
+          onClick={() => {
+            triggerHaptic(10);
+            handlePanToFacilityCenter();
+          }}
+          className="w-12 h-12 rounded-full backdrop-blur-2xl bg-slate-900/85 hover:bg-slate-800 text-white border border-white/15 shadow-2xl flex items-center justify-center active:scale-90 transition-all"
           title="불정로 50 화면 센터로 이동"
         >
           <MapPin className="w-5 h-5 text-emerald-400" />
@@ -955,12 +1046,15 @@ export const MapView: React.FC<MapViewProps> = ({
         {/* 🚨 긴급상황 경광등 핀 생성 버튼 */}
         <button
           type="button"
-          onClick={handleTriggerEmergencyAlert}
+          onClick={() => {
+            triggerHaptic(15);
+            handleTriggerEmergencyAlert();
+          }}
           disabled={isCreatingAlert}
-          className={`w-11 h-11 rounded-2xl shadow-xl flex items-center justify-center active:scale-95 transition-all relative border backdrop-blur-xl ${
+          className={`w-12 h-12 rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-all relative border backdrop-blur-2xl ${
             alerts.length > 0
               ? 'bg-rose-950/90 text-white border-rose-500 shadow-rose-950/80'
-              : 'bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-white/10'
+              : 'bg-slate-900/85 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-white/15'
           }`}
           title={
             alerts.length > 0
@@ -976,7 +1070,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
           {/* 발생 건수 뱃지 */}
           {alerts.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 px-1 rounded-full bg-rose-600 border border-white text-white text-[10px] font-black flex items-center justify-center leading-none z-10 shadow">
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-rose-600 border border-white text-white text-[10px] font-black flex items-center justify-center leading-none z-10 shadow">
               {alerts.length}
             </span>
           )}
@@ -993,6 +1087,91 @@ export const MapView: React.FC<MapViewProps> = ({
           현장 배수로 등록
         </button>
       )}
+
+      {/* 🍏 Apple Maps 스타일: 가장 가까운 배수로 스마트 자동 추천 카드 (주사님 모드) */}
+      {userRole === 'INSPECTOR' &&
+        viewMode === 'map' &&
+        !selectedDitch &&
+        !selectedAlert &&
+        nearestDitchInfo && (
+          <div className="absolute bottom-4 sm:bottom-6 inset-x-3 sm:inset-x-auto sm:right-6 sm:w-96 z-20 pointer-events-auto animate-in slide-in-from-bottom duration-300">
+            <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl p-4 sm:p-5 shadow-2xl text-white space-y-3">
+              {/* 상단 거리 & 배지 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs font-black text-emerald-400">
+                    {nearestDitchInfo.distanceMeters !== null
+                      ? `📍 현재 위치에서 약 ${nearestDitchInfo.distanceMeters}m (최단거리)`
+                      : '📍 다음 점검 추천 배수로'}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-slate-300">
+                  {nearestDitchInfo.ditch.code.replace(/(주차장|도로)/g, '정자 앞')}
+                </span>
+              </div>
+
+              {/* 배수로 명칭 및 상태 */}
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <h4 className="text-lg font-black text-white tracking-tight">
+                    {nearestDitchInfo.ditch.name}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {(nearestDitchInfo.ditch.address || nearestDitchInfo.ditch.section || '야외 배수로 시설물').replace(/(주차장|도로)/g, '정자 앞')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    onSelectDitch(nearestDitchInfo.ditch);
+                    if (mapRef.current) {
+                      mapRef.current.flyTo(
+                        [nearestDitchInfo.ditch.latitude, nearestDitchInfo.ditch.longitude],
+                        19,
+                        { duration: 0.8 }
+                      );
+                    }
+                  }}
+                  className="text-xs font-bold text-blue-400 hover:text-blue-300 underline underline-offset-4"
+                >
+                  위치 보기
+                </button>
+              </div>
+
+              {/* ⚡ 3초 원터치 완료 대형 버튼 */}
+              <div className="pt-1 flex gap-2">
+                <button
+                  type="button"
+                  disabled={isFastPassing}
+                  onClick={() => handlePerformFastPass(nearestDitchInfo.ditch)}
+                  className="flex-1 h-13 sm:h-14 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 active:scale-95 transition-all"
+                >
+                  <Zap className="w-5 h-5 text-slate-950 fill-current" />
+                  <span>{isFastPassing ? '저장 중...' : '⚡ 3초 원터치 완료'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    if (onOpenInspectionForm) {
+                      onOpenInspectionForm(nearestDitchInfo.ditch);
+                    } else {
+                      onStartInspection(nearestDitchInfo.ditch);
+                    }
+                  }}
+                  className="px-4 h-13 sm:h-14 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-2xl flex items-center justify-center border border-white/10 active:scale-95 transition-all"
+                >
+                  상세 점검
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* 🚨 긴급상황 경광등 핀 상세 및 해제 시트 */}
       {selectedAlert && (
@@ -1357,49 +1536,38 @@ export const MapView: React.FC<MapViewProps> = ({
 
             {/* 액션 버튼 그룹 */}
             {userRole === 'INSPECTOR' ? (
-              // [주사님 모드]: 5초 패스트패스 & 상세점검
+              // [주사님 모드]: 3초 원터치 완료 & 상세점검
               <div className="space-y-2 pt-1">
                 {onFastPassInspection && (
                   <button
                     type="button"
                     disabled={isFastPassing}
-                    onClick={async () => {
-                      setIsFastPassing(true);
-                      try {
-                        await onFastPassInspection(selectedDitch);
-                        confetti({
-                          particleCount: 65,
-                          spread: 65,
-                          origin: { y: 0.8 },
-                        });
-                      } catch (err) {
-                        console.error('Fast pass error:', err);
-                        alert('점검 저장 중 문제가 발생했습니다.');
-                      } finally {
-                        setIsFastPassing(false);
-                      }
-                    }}
-                    className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-96 transition-all"
+                    onClick={() => handlePerformFastPass(selectedDitch)}
+                    className="w-full h-13 sm:h-14 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2.5 shadow-xl shadow-emerald-500/20 active:scale-95 transition-all"
                   >
                     <Zap className="w-5 h-5 text-slate-950 fill-current" />
-                    <span>{isFastPassing ? '저장 중...' : '⚡ 5초 패스트패스 (전부 정상 즉시 완료)'}</span>
+                    <span>{isFastPassing ? '저장 중...' : '⚡ 3초 원터치 완료 (이상없음)'}</span>
                   </button>
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      triggerHaptic(10);
                       onOpenInspectionForm
                         ? onOpenInspectionForm(selectedDitch)
-                        : onStartInspection(selectedDitch)
-                    }
-                    className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 shadow active:scale-96 transition-all"
+                        : onStartInspection(selectedDitch);
+                    }}
+                    className="h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4 text-blue-200" />
                     상세 점검 (사진/체크)
                   </button>
                   <button
-                    onClick={() => onViewHistory(selectedDitch)}
-                    className="h-11 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-96 transition-all"
+                    onClick={() => {
+                      triggerHaptic(10);
+                      onViewHistory(selectedDitch);
+                    }}
+                    className="h-12 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-95 transition-all"
                   >
                     <History className="w-4 h-4 text-emerald-400" />
                     과거 점검 이력
@@ -1407,48 +1575,37 @@ export const MapView: React.FC<MapViewProps> = ({
                 </div>
               </div>
             ) : (
-              // [관리자 모드]: 5초 패스트패스 & 점검/수정
+              // [관리자 모드]: 3초 패스트패스 & 점검/수정
               <div className="space-y-2 pt-1">
                 {onFastPassInspection && (
                   <button
                     type="button"
                     disabled={isFastPassing}
-                    onClick={async () => {
-                      setIsFastPassing(true);
-                      try {
-                        await onFastPassInspection(selectedDitch);
-                        confetti({
-                          particleCount: 65,
-                          spread: 65,
-                          origin: { y: 0.8 },
-                        });
-                      } catch (err) {
-                        console.error('Fast pass error:', err);
-                        alert('점검 저장 중 문제가 발생했습니다.');
-                      } finally {
-                        setIsFastPassing(false);
-                      }
-                    }}
-                    className="w-full h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-96 transition-all"
+                    onClick={() => handlePerformFastPass(selectedDitch)}
+                    className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm rounded-2xl flex items-center justify-center gap-2 shadow-lg active:scale-96 transition-all"
                   >
-                    <Zap className="w-4 h-4 text-slate-950 fill-current" />
-                    <span>{isFastPassing ? '저장 중...' : '⚡ 5초 패스트패스 (전부 정상 즉시 완료)'}</span>
+                    <Zap className="w-5 h-5 text-slate-950 fill-current" />
+                    <span>{isFastPassing ? '저장 중...' : '⚡ 3초 패스트패스 (전부 정상 즉시 완료)'}</span>
                   </button>
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() =>
+                    onClick={() => {
+                      triggerHaptic(10);
                       onOpenInspectionForm
                         ? onOpenInspectionForm(selectedDitch)
-                        : onStartInspection(selectedDitch)
-                    }
+                        : onStartInspection(selectedDitch);
+                    }}
                     className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 active:scale-96 shadow transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4 text-blue-200" />
                     상세 점검
                   </button>
                   <button
-                    onClick={() => onEditDitch(selectedDitch)}
+                    onClick={() => {
+                      triggerHaptic(10);
+                      onEditDitch(selectedDitch);
+                    }}
                     className="h-11 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-96 transition-all"
                   >
                     <Edit className="w-4 h-4" />
@@ -1456,7 +1613,10 @@ export const MapView: React.FC<MapViewProps> = ({
                   </button>
                 </div>
                 <button
-                  onClick={() => onViewHistory(selectedDitch)}
+                  onClick={() => {
+                    triggerHaptic(10);
+                    onViewHistory(selectedDitch);
+                  }}
                   className="w-full h-10 bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs rounded-2xl flex items-center justify-center gap-1.5 border border-white/10 active:scale-96 transition-all"
                 >
                   <History className="w-4 h-4 text-emerald-400" />
@@ -1577,6 +1737,30 @@ export const MapView: React.FC<MapViewProps> = ({
             userRole={userRole}
             onGoHome={onGoHome}
           />
+        </div>
+      )}
+
+      {/* 🍏 Apple Pay 스타일 점검 완료 피드백 모달 */}
+      {fastPassSuccessDitch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900/95 backdrop-blur-2xl border border-white/20 shadow-2xl rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center max-w-xs w-full pointer-events-auto transform transition-all">
+            {/* 둥근 녹색 체크 링 (Apple Pay 스타일 바운스) */}
+            <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/30 animate-bounce">
+              <CheckCircle2 className="w-12 h-12 text-emerald-400 stroke-[2.5]" />
+            </div>
+            <h3 className="text-xl font-black text-white tracking-tight mb-1">
+              3초 점검 완료!
+            </h3>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold text-xs mb-2">
+              <span>{fastPassSuccessDitch.name}</span>
+              <span className="text-emerald-500/60 font-mono">
+                ({fastPassSuccessDitch.code.replace(/(주차장|도로)/g, '정자 앞')})
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+              '이상 없음'으로 안전하게 동기화되었습니다.
+            </p>
+          </div>
         </div>
       )}
     </div>

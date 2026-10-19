@@ -65,6 +65,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
   // 🎯 스마트 아코디언 상태 (기본값: false = 90% 이상없음 모드)
   const [isAbnormal, setIsAbnormal] = useState<boolean>(false);
   const [showMemoInput, setShowMemoInput] = useState<boolean>(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState<boolean>(false);
 
   // 폼 세부 상태
   const [sedimentStatus, setSedimentStatus] = useState<SedimentStatus>('정상');
@@ -299,16 +300,22 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
     };
 
     try {
-      await onSave(newRecord);
-      triggerHaptic([30, 50, 30]);
+      setShowSuccessAnimation(true);
+      triggerHaptic([30, 80, 40]);
 
       // 시각 피드백 (축하 폭죽)
       confetti({
-        particleCount: 55,
-        spread: 60,
-        origin: { y: 0.8 },
+        particleCount: 65,
+        spread: 65,
+        origin: { y: 0.75 },
       });
+
+      // Apple Pay 스타일 애니메이션 감상 대기 (1.1초) 후 저장 및 창 닫기
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      await onSave(newRecord);
     } catch (err) {
+      setShowSuccessAnimation(false);
       console.error('Save failed:', err);
       alert('저장 중 문제가 발생했습니다.');
       setIsSaving(false);
@@ -469,34 +476,29 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
                   </button>
                 </>
               ) : (
-                <div className="w-full h-full p-2 flex flex-col items-center justify-center gap-1.5 bg-slate-950">
-                  <div className="flex items-center gap-1.5 w-full">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic(10);
-                        cameraInputRef.current?.click();
-                      }}
-                      className="flex-1 py-2 px-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black flex flex-col items-center justify-center gap-1 active:scale-95 transition-all shadow"
-                    >
-                      <Camera className="w-4 h-4 text-white" />
-                      <span>카메라</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic(10);
-                        galleryInputRef.current?.click();
-                      }}
-                      className="flex-1 py-2 px-1 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all border border-white/10"
-                    >
-                      <ImageIcon className="w-4 h-4 text-slate-300" />
-                      <span>앨범</span>
-                    </button>
-                  </div>
-                  <span className="text-[10px] text-slate-500">
-                    현장 사진 등록
-                  </span>
+                <div className="w-full h-full p-2 flex flex-col items-center justify-center gap-1.5 bg-slate-950/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(10);
+                      cameraInputRef.current?.click();
+                    }}
+                    className="w-full flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md shadow-emerald-950/40"
+                  >
+                    <Camera className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                    <span>현장 사진 촬영</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(10);
+                      galleryInputRef.current?.click();
+                    }}
+                    className="w-full h-7 bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/10"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
+                    <span>보관함(앨범)에서 선택</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -821,6 +823,31 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
           afterDate="금회 점검 사진"
           onClose={() => setShowSliderModal(false)}
         />
+      )}
+
+      {/* 🍏 Apple Pay 스타일 점검 완료 피드백 모달 */}
+      {showSuccessAnimation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900/95 backdrop-blur-2xl border border-white/20 shadow-2xl rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center max-w-xs w-full pointer-events-auto transform transition-all">
+            <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/30 animate-bounce">
+              <CheckCircle2 className="w-12 h-12 text-emerald-400 stroke-[2.5]" />
+            </div>
+            <h3 className="text-xl font-black text-white tracking-tight mb-1">
+              점검 완료!
+            </h3>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold text-xs mb-2">
+              <span>{ditch.name}</span>
+              <span className="text-emerald-500/60 font-mono">
+                ({ditch.code.replace(/(주차장|도로)/g, '정자 앞')})
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+              {!isAbnormal
+                ? "'이상 없음'으로 안전하게 기록되었습니다."
+                : '이상 내역이 안전하게 접수되었습니다.'}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
