@@ -530,66 +530,95 @@ export const App: React.FC = () => {
 
         {/* 우측 사용자 권한 뱃지 & 설정 버튼 */}
         <div className="flex items-center gap-2">
-          {/* 오프라인 보장 & 대기 큐 동기화 상태 뱃지 버튼 */}
+          {/* 관리자 모드 전용: 오프라인 보장 & 대기 큐 동기화 상태 뱃지 버튼 */}
+          {userRole === 'ADMIN' && (
+            <button
+              onClick={() => setIsOfflineModalOpen(true)}
+              className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
+                !syncStatus.isOnline
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30 animate-pulse'
+                  : syncStatus.pendingCount > 0
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
+              }`}
+              title="오프라인 작동 및 동기화 상태 (클릭 시 상세 모달 및 즉시 동기화)"
+            >
+              <span className="relative flex h-2 w-2">
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    !syncStatus.isOnline
+                      ? 'bg-rose-400'
+                      : syncStatus.pendingCount > 0
+                      ? 'bg-amber-400'
+                      : 'bg-emerald-400'
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    !syncStatus.isOnline
+                      ? 'bg-rose-500'
+                      : syncStatus.pendingCount > 0
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-400'
+                  }`}
+                />
+              </span>
+              <span className="font-bold text-xs">
+                {!syncStatus.isOnline
+                  ? '오프라인'
+                  : syncStatus.isSyncing
+                  ? '동기화중...'
+                  : syncStatus.pendingCount > 0
+                  ? `대기 ${syncStatus.pendingCount}건`
+                  : '로컬보장'}
+              </span>
+            </button>
+          )}
+
+          {/* 클라우드 실시간 동기화 상태 뱃지 & 버튼 */}
+          {/* 주사님 모드: 클릭 시 Firebase 설정 대신 붙임2(오프라인&동기화 관리) 모달이 열림 */}
           <button
-            onClick={() => setIsOfflineModalOpen(true)}
+            onClick={() => {
+              if (userRole === 'INSPECTOR') {
+                setIsOfflineModalOpen(true);
+              } else {
+                setIsFirebaseModalOpen(true);
+              }
+            }}
             className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
               !syncStatus.isOnline
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30 animate-pulse'
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30'
                 : syncStatus.pendingCount > 0
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
-                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
-            }`}
-            title="오프라인 작동 및 동기화 상태 (클릭 시 상세 모달 및 즉시 동기화)"
-          >
-            <span className="relative flex h-2 w-2">
-              <span
-                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                  !syncStatus.isOnline
-                    ? 'bg-rose-400'
-                    : syncStatus.pendingCount > 0
-                    ? 'bg-amber-400'
-                    : 'bg-emerald-400'
-                }`}
-              />
-              <span
-                className={`relative inline-flex rounded-full h-2 w-2 ${
-                  !syncStatus.isOnline
-                    ? 'bg-rose-500'
-                    : syncStatus.pendingCount > 0
-                    ? 'bg-amber-500'
-                    : 'bg-emerald-400'
-                }`}
-              />
-            </span>
-            <span className="font-bold text-xs">
-              {!syncStatus.isOnline
-                ? '오프라인'
-                : syncStatus.isSyncing
-                ? '동기화중...'
-                : syncStatus.pendingCount > 0
-                ? `대기 ${syncStatus.pendingCount}건`
-                : '로컬보장'}
-            </span>
-          </button>
-
-          {/* Firebase 클라우드 실시간 동기화 상태 뱃지 & 설정 버튼 */}
-          <button
-            onClick={() => setIsFirebaseModalOpen(true)}
-            className={`h-9 px-2.5 sm:px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all active:scale-95 ${
-              isCloudConnected
+                : isCloudConnected
                 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/25'
                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
             }`}
-            title="클라우드 실시간 동기화 상태 (클릭 시 상세 설정)"
+            title={
+              userRole === 'INSPECTOR'
+                ? '실시간 클라우드 공유 및 오프라인 상태 (클릭 시 동기화/캐시 관리)'
+                : '클라우드 실시간 동기화 상태 (클릭 시 Firebase & GitHub 배포 설정)'
+            }
           >
             <Cloud className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline font-bold">
-              {isCloudConnected ? '실시간 공유중' : '클라우드'}
+              {!syncStatus.isOnline
+                ? '오프라인'
+                : syncStatus.pendingCount > 0
+                ? `대기 ${syncStatus.pendingCount}건`
+                : isCloudConnected
+                ? '실시간 공유중'
+                : '클라우드'}
             </span>
             <span
               className={`w-2 h-2 rounded-full ${
-                isCloudConnected ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400' : 'bg-slate-500'
+                !syncStatus.isOnline
+                  ? 'bg-rose-400'
+                  : syncStatus.pendingCount > 0
+                  ? 'bg-amber-400'
+                  : isCloudConnected
+                  ? 'bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400'
+                  : 'bg-slate-500'
               }`}
             />
           </button>
@@ -753,8 +782,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* F. Firebase & GitHub 배포 설정 모달 */}
-      {isFirebaseModalOpen && (
+      {/* F. Firebase & GitHub 배포 설정 모달 (시설 관리자 전용) */}
+      {isFirebaseModalOpen && userRole === 'ADMIN' && (
         <FirebaseModal
           onClose={() => setIsFirebaseModalOpen(false)}
           onConfigUpdated={loadData}

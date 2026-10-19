@@ -100,10 +100,10 @@ export const OfflineSyncModal: React.FC<OfflineSyncModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                오프라인 & 타일 캐시 관리
+                실시간 공유 & 오프라인 관리
               </h3>
               <p className="text-[11px] text-slate-400">
-                통신 음영지역 100% 현장 작동 보장 시스템
+                실시간 클라우드 전송 및 통신 음영지역 100% 현장 작동 보장
               </p>
             </div>
           </div>
