@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
 import {
-  Search,
   CheckCircle2,
   AlertTriangle,
   History,
@@ -307,41 +306,22 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
           })}
         </div>
 
-        {/* 3. 검색창 및 14일 경과 토글 */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="번호 또는 명칭 검색 (예: 1, 별관, 정자)"
-              className="w-full bg-slate-950/80 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
+        {/* 3. 14일 경과 시설물 전용 필터 */}
+        <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => {
               triggerHaptic(10);
               setOnlyOverdue((prev) => !prev);
             }}
-            className={`h-9 px-3 rounded-xl text-xs font-black border flex items-center gap-1.5 shrink-0 transition-all active:scale-95 ${
+            className={`h-8 px-3 rounded-xl text-xs font-black border flex items-center gap-1.5 transition-all active:scale-95 ${
               onlyOverdue
                 ? 'bg-amber-600 text-white border-amber-400 shadow-md shadow-amber-950/80 ring-2 ring-amber-400/40'
                 : 'bg-white/5 text-amber-300 border-white/10 hover:bg-white/10'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>⚠️ 14일 경과만</span>
+            <span>⚠️ 14일 경과 시설물만</span>
           </button>
         </div>
 
@@ -382,7 +362,7 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
               선택한 조건의 배수로가 없습니다.
             </h3>
             <p className="text-xs text-slate-500">
-              구역 필터를 변경하거나 검색어를 지워보세요.
+              구역 필터를 변경하거나 14일 경과 필터를 해제해보세요.
             </p>
             <button
               type="button"
