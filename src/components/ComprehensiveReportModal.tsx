@@ -54,14 +54,20 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
   const countDanger = periodInspections.filter((i) => i.urgencyLevel === '긴급조치' || i.sedimentStatus === '완전막힘' || i.structureStatus === '파손/붕괴').length;
 
   // 구역 목록
-  const sections = ['정자 앞', '본관', '별관', '식수'];
+  const sections = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
   const getSection = (d: DitchMaster) => {
     if (!d) return '정자 앞';
     const s = d.section || '';
     const n = d.name || '';
+    const code = d.code || '';
+    const memo = d.memo || '';
+    const addr = d.address || '';
+    const combined = `${s} ${n} ${code} ${memo} ${addr}`;
+
     if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '본관' || n.includes('본관')) return '본관';
     if (s === '별관' || n.includes('별관')) return '별관';
+    if (s === '본관4층' || combined.includes('본관4층') || combined.includes('4층') || combined.includes('4F')) return '본관4층';
+    if (s === '본관3층' || combined.includes('본관3층') || combined.includes('3층') || combined.includes('3F') || s === '본관' || n.includes('본관')) return '본관3층';
     if (
       s === '정자 앞' ||
       s === '도로' ||

@@ -11,8 +11,8 @@ interface DitchEditModalProps {
   onClose: () => void;
 }
 
-// 현장 맞춤형 4개 구역 (정자 앞, 본관, 별관, 식수)
-const SECTIONS = ['정자 앞', '본관', '별관', '식수'] as const;
+// 현장 맞춤형 5개 구역 (정자 앞, 본관3층, 본관4층, 별관, 식수)
+const SECTIONS = ['정자 앞', '본관3층', '본관4층', '별관', '식수'] as const;
 
 export const DitchEditModal: React.FC<DitchEditModalProps> = ({
   ditch,
@@ -24,10 +24,12 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
 }) => {
   const isNew = !ditch;
 
-  // 1. 구역 선택 (정자 앞, 본관, 별관, 식수)
+  // 1. 구역 선택 (정자 앞, 본관3층, 본관4층, 별관, 식수)
   const initialSection =
     ditch?.section === '주차장' || ditch?.section === '도로'
       ? '정자 앞'
+      : ditch?.section === '본관'
+      ? (ditch.name.includes('4층') ? '본관4층' : '본관3층')
       : ditch?.section && SECTIONS.includes(ditch.section as any)
       ? ditch.section
       : '정자 앞';
@@ -167,7 +169,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
               </span>
               구역 선택
             </label>
-            <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2">
               {SECTIONS.map((sec) => {
                 const selected = section === sec;
                 return (
@@ -175,7 +177,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                     key={sec}
                     type="button"
                     onClick={() => handleSelectSection(sec)}
-                    className={`min-h-[50px] px-1 rounded-xl font-black text-xs sm:text-sm border-2 transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
+                    className={`min-h-[48px] px-0.5 rounded-xl font-black text-[11px] sm:text-xs border-2 transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
                       selected
                         ? sec === '식수'
                           ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-950'
@@ -183,9 +185,9 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                         : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
                     }`}
                   >
-                    <div className="flex items-center gap-1">
-                      {selected && <Check className="w-3.5 h-3.5" />}
-                      <span>{sec === '식수' ? '🌲 식수' : sec}</span>
+                    <div className="flex items-center gap-0.5">
+                      {selected && <Check className="w-3 h-3 flex-shrink-0" />}
+                      <span className="truncate">{sec === '식수' ? '🌲 식수' : sec}</span>
                     </div>
                   </button>
                 );

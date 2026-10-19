@@ -156,18 +156,45 @@ export const MapView: React.FC<MapViewProps> = ({
     [37.3611, 127.1149]  // 북동쪽 (NE: 북 300m, 동 300m)
   );
 
-  // 구역 선택 기본값: '정자 앞', '본관', '별관'만 기본 선택 (사용자 요청: 최초에 전체가 아닌 정자 앞·본관·별관만 선택)
-  const DEFAULT_SECTIONS = ['정자 앞', '본관', '별관'];
+  // 구역 선택 기본값: '정자 앞', '본관3층', '본관4층', '별관'만 기본 선택 (식수는 기본 제외)
+  const DEFAULT_SECTIONS = ['정자 앞', '본관3층', '본관4층', '별관'];
   const [selectedSections, setSelectedSections] = useState<string[]>(DEFAULT_SECTIONS);
   const [isOverdueFilter, setIsOverdueFilter] = useState<boolean>(false);
 
-  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞' 변환 및 '식수' 감지)
+  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '본관3층', '본관4층', '별관', '식수' 판별)
   const getNormalizedSection = (d: DitchMaster): string => {
     const s = d.section || '';
     const n = d.name || '';
+    const c = d.code || '';
+    const a = d.address || '';
+    const m = d.memo || '';
+    const fullText = `${s} ${n} ${c} ${a} ${m}`;
+
     if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '본관' || n.includes('본관')) return '본관';
     if (s === '별관' || n.includes('별관')) return '별관';
+    if (
+      s === '본관4층' ||
+      n.includes('본관4층') ||
+      c.includes('본관4층') ||
+      fullText.includes('본관4층') ||
+      fullText.includes('본관 4층') ||
+      (s.includes('본관') && fullText.includes('4층'))
+    ) {
+      return '본관4층';
+    }
+    if (
+      s === '본관3층' ||
+      n.includes('본관3층') ||
+      c.includes('본관3층') ||
+      fullText.includes('본관3층') ||
+      fullText.includes('본관 3층') ||
+      (s.includes('본관') && fullText.includes('3층'))
+    ) {
+      return '본관3층';
+    }
+    if (s === '본관' || n.includes('본관')) {
+      return '본관3층';
+    }
     if (
       s === '정자 앞' ||
       s === '도로' ||
@@ -689,22 +716,22 @@ export const MapView: React.FC<MapViewProps> = ({
           </button>
         </div>
 
-        {/* 5. 구역 선택 필터 메뉴 (전체 / 정자 앞 / 본관 / 별관 / 식수) */}
+        {/* 5. 구역 선택 필터 메뉴 (전체 / 정자 앞 / 본관3층 / 본관4층 / 별관 / 식수) */}
         <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto py-0.5 px-0.5 no-scrollbar">
           {/* 전체 버튼 */}
           {(() => {
             const allDitchesCount = ditches.length;
-            const isAllSelected = selectedSections.length === 4;
+            const isAllSelected = selectedSections.length === 5;
             return (
               <button
                 type="button"
                 onClick={() => {
                   if (isAllSelected) {
-                    // 이미 전체 선택된 상태에서 클릭 시 기본값(정자 앞, 본관, 별관)으로 복귀
-                    setSelectedSections(['정자 앞', '본관', '별관']);
+                    // 이미 전체 선택된 상태에서 클릭 시 기본값(정자 앞, 본관3층, 본관4층, 별관)으로 복귀
+                    setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관']);
                   } else {
-                    // 전체 4개 구역 모두 선택
-                    setSelectedSections(['정자 앞', '본관', '별관', '식수']);
+                    // 전체 5개 구역 모두 선택
+                    setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관', '식수']);
                   }
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
@@ -726,8 +753,8 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })()}
 
-          {/* 4개 개별 구역 버튼 (기본 선택: 정자 앞, 본관, 별관) */}
-          {(['정자 앞', '본관', '별관', '식수'] as const).map((sec) => {
+          {/* 5개 개별 구역 버튼 (기본 선택: 정자 앞, 본관3층, 본관4층, 별관) */}
+          {(['정자 앞', '본관3층', '본관4층', '별관', '식수'] as const).map((sec) => {
             const isSelected = selectedSections.includes(sec);
             const count = ditches.filter((d) => getNormalizedSection(d) === sec).length;
             const label = sec === '식수' ? '🌲 식수' : sec;
@@ -742,7 +769,7 @@ export const MapView: React.FC<MapViewProps> = ({
                     if (selectedSections.length > 1) {
                       setSelectedSections((prev) => prev.filter((s) => s !== sec));
                     } else {
-                      setSelectedSections(['정자 앞', '본관', '별관']);
+                      setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관']);
                     }
                   } else {
                     // 미선택 상태면 추가 선택

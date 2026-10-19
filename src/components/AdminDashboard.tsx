@@ -94,13 +94,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState<boolean>(false);
 
-  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '식수' 감지)
+  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '본관3층', '본관4층', '별관', '식수' 판별)
   const getNormalizedDitchSection = (d: DitchMaster): string => {
     const s = d.section || '';
     const n = d.name || '';
+    const c = d.code || '';
+    const a = d.address || '';
+    const m = d.memo || '';
+    const fullText = `${s} ${n} ${c} ${a} ${m}`;
+
     if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '본관' || n.includes('본관')) return '본관';
     if (s === '별관' || n.includes('별관')) return '별관';
+    if (
+      s === '본관4층' ||
+      n.includes('본관4층') ||
+      c.includes('본관4층') ||
+      fullText.includes('본관4층') ||
+      fullText.includes('본관 4층') ||
+      (s.includes('본관') && fullText.includes('4층'))
+    ) {
+      return '본관4층';
+    }
+    if (
+      s === '본관3층' ||
+      n.includes('본관3층') ||
+      c.includes('본관3층') ||
+      fullText.includes('본관3층') ||
+      fullText.includes('본관 3층') ||
+      (s.includes('본관') && fullText.includes('3층'))
+    ) {
+      return '본관3층';
+    }
+    if (s === '본관' || n.includes('본관')) {
+      return '본관3층';
+    }
     if (
       s === '정자 앞' ||
       s === '도로' ||
@@ -115,11 +142,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // 표준 구역 목록
-  const sections = ['정자 앞', '본관', '별관', '식수'];
+  const sections = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
 
-  // FMS 표준 구역별 요약 지표 (정자 앞, 본관, 별관, 식수)
+  // FMS 표준 구역별 요약 지표 (정자 앞, 본관3층, 본관4층, 별관, 식수)
   const sectionSummaryList = useMemo(() => {
-    const list = ['정자 앞', '본관', '별관', '식수'];
+    const list = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
     return list.map((sec) => {
       const secDitches = ditches.filter((d) => getNormalizedDitchSection(d) === sec);
       const total = secDitches.length;
@@ -136,7 +163,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   }, [ditches]);
 
-  // 구역별 탭 구분 목록 및 건수 (전체 배수로, 정자 앞, 본관, 별관, 식수)
+  // 구역별 탭 구분 목록 및 건수 (전체 배수로, 정자 앞, 본관3층, 본관4층, 별관, 식수)
   const sectionTabs = useMemo(() => {
     const counts: Record<string, { total: number; issueCount: number }> = {
       ALL: {
@@ -144,7 +171,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         issueCount: ditches.filter((d) => d.currentStatus === 'WARNING' || d.currentStatus === 'DANGER').length,
       },
       '정자 앞': { total: 0, issueCount: 0 },
-      '본관': { total: 0, issueCount: 0 },
+      '본관3층': { total: 0, issueCount: 0 },
+      '본관4층': { total: 0, issueCount: 0 },
       '별관': { total: 0, issueCount: 0 },
       '식수': { total: 0, issueCount: 0 },
     };
@@ -162,7 +190,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return [
       { key: 'ALL', label: '전체 배수로', count: counts['ALL'].total, issueCount: counts['ALL'].issueCount },
       { key: '정자 앞', label: '정자 앞', count: counts['정자 앞'].total, issueCount: counts['정자 앞'].issueCount },
-      { key: '본관', label: '본관', count: counts['본관'].total, issueCount: counts['본관'].issueCount },
+      { key: '본관3층', label: '본관3층', count: counts['본관3층'].total, issueCount: counts['본관3층'].issueCount },
+      { key: '본관4층', label: '본관4층', count: counts['본관4층'].total, issueCount: counts['본관4층'].issueCount },
       { key: '별관', label: '별관', count: counts['별관'].total, issueCount: counts['별관'].issueCount },
       { key: '식수', label: '🌲 식수', count: counts['식수'].total, issueCount: counts['식수'].issueCount },
     ];
