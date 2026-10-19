@@ -167,8 +167,8 @@ export const MapView: React.FC<MapViewProps> = ({
     [37.3611, 127.1149]  // 북동쪽 (NE: 북 300m, 동 300m)
   );
 
-  // 구역 전체 목록 및 초기 선택값 (기본 5개 전체 구역 선택)
-  const [selectedSections, setSelectedSections] = useState<string[]>([...ALL_SECTIONS]);
+  // 구역 전체 목록 및 초기 선택값 (기본값: 전체 필터 해제 상태 [])
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [isOverdueFilter, setIsOverdueFilter] = useState<boolean>(false);
 
   // 🗺️ 지도 뷰 vs 📋 번호 목록 뷰 모드 ('map' | 'list')
@@ -180,14 +180,16 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   });
 
-  // 지도 뷰에서 빠른 번호 이동(Quick Dial)용 배수로 목록
+  // 지도 뷰에서 빠른 번호 이동(Quick Dial)용 배수로 목록 (구역 필터를 클릭했을 때만 활성화)
   const visibleDitchesForQuickDial = React.useMemo(() => {
+    // 1. 필터가 선택되지 않은 상태(전체 해제 상태)에서는 번호 이동 바를 띄우지 않음
+    if (selectedSections.length === 0) {
+      return [];
+    }
+
     const list = ditches.filter((d) => {
       const normSec = getNormalizedSection(d);
-      if (selectedSections.length > 0 && !selectedSections.includes(normSec)) {
-        return false;
-      }
-      return true;
+      return selectedSections.includes(normSec);
     });
     return list
       .map((d) => ({ num: extractDitchNumber(d.name, d.code), ditch: d }))
