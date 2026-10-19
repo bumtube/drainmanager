@@ -107,6 +107,92 @@ export const SECTION_COLOR_CONFIG: Record<string, SectionColorMeta> = {
   },
 };
 
+export const ALL_SECTIONS: string[] = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
+export type SectionName = string;
+
 export const getSectionTheme = (sec: string): SectionColorMeta => {
   return SECTION_COLOR_CONFIG[sec] || SECTION_COLOR_CONFIG['정자 앞'];
 };
+
+/**
+ * 전역 배수로 구역명 표준 정규화 유틸리티 (단일 진실 원천)
+ * 시설 명칭, 섹션, 코드, 주소, 메모를 종합 분석하여
+ * ['정자 앞', '본관3층', '본관4층', '별관', '식수'] 5대 구역으로 오차 없이 분류합니다.
+ */
+export function getNormalizedSection(d: {
+  section?: string;
+  name?: string;
+  code?: string;
+  address?: string;
+  memo?: string;
+} | null | undefined): string {
+  if (!d) return '정자 앞';
+  const s = (d.section || '').trim();
+  const n = (d.name || '').trim();
+  const c = (d.code || '').trim();
+  const a = (d.address || '').trim();
+  const m = (d.memo || '').trim();
+  const fullText = `${s} ${n} ${c} ${a} ${m}`;
+
+  // 1. 식수 (조경수)
+  if (s === '식수' || n.includes('식수') || c.includes('식수') || fullText.includes('식수')) {
+    return '식수';
+  }
+
+  // 2. 별관
+  if (s === '별관' || n.includes('별관') || c.includes('별관') || fullText.includes('별관')) {
+    return '별관';
+  }
+
+  // 3. 본관4층 (4층 우선 판별)
+  if (
+    s.includes('본관4층') ||
+    n.includes('본관4층') ||
+    c.includes('본관4층') ||
+    fullText.includes('본관4층') ||
+    fullText.includes('본관 4층') ||
+    fullText.includes('4층') ||
+    fullText.includes('4F') ||
+    fullText.includes('4f')
+  ) {
+    return '본관4층';
+  }
+
+  // 4. 본관3층 (또는 3층, 또는 층수 없이 '본관'만 명시된 경우 본관3층으로 분류)
+  if (
+    s.includes('본관3층') ||
+    n.includes('본관3층') ||
+    c.includes('본관3층') ||
+    fullText.includes('본관3층') ||
+    fullText.includes('본관 3층') ||
+    s.includes('본관') ||
+    n.includes('본관') ||
+    c.includes('본관') ||
+    fullText.includes('본관') ||
+    fullText.includes('3층') ||
+    fullText.includes('3F') ||
+    fullText.includes('3f')
+  ) {
+    return '본관3층';
+  }
+
+  // 5. 정자 앞 (정자, 도로, 주차장)
+  if (
+    s.includes('정자') ||
+    n.includes('정자') ||
+    c.includes('정자') ||
+    s.includes('도로') ||
+    n.includes('도로') ||
+    c.includes('도로') ||
+    s.includes('주차장') ||
+    n.includes('주차장') ||
+    c.includes('주차장') ||
+    fullText.includes('정자') ||
+    fullText.includes('도로') ||
+    fullText.includes('주차장')
+  ) {
+    return '정자 앞';
+  }
+
+  return s || '정자 앞';
+}

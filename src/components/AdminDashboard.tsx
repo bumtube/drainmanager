@@ -34,7 +34,12 @@ import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { PrintReportModal } from './PrintReportModal';
 import { ComprehensiveReportModal } from './ComprehensiveReportModal';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
-import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
+import {
+  SECTION_COLOR_CONFIG,
+  getSectionTheme,
+  getNormalizedSection,
+  ALL_SECTIONS,
+} from '../utils/sectionTheme';
 
 
 export type SortField = 'code' | 'name' | 'section' | 'currentStatus' | 'lastInspectedAt';
@@ -95,52 +100,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [enlargedAlertPhoto, setEnlargedAlertPhoto] = useState<string | null>(null);
   const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState<boolean>(false);
 
-  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '본관3층', '본관4층', '별관', '식수' 판별)
-  const getNormalizedDitchSection = (d: DitchMaster): string => {
-    const s = d.section || '';
-    const n = d.name || '';
-    const c = d.code || '';
-    const a = d.address || '';
-    const m = d.memo || '';
-    const fullText = `${s} ${n} ${c} ${a} ${m}`;
-
-    if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '별관' || n.includes('별관')) return '별관';
-    if (
-      s === '본관4층' ||
-      n.includes('본관4층') ||
-      c.includes('본관4층') ||
-      fullText.includes('본관4층') ||
-      fullText.includes('본관 4층') ||
-      (s.includes('본관') && fullText.includes('4층'))
-    ) {
-      return '본관4층';
-    }
-    if (
-      s === '본관3층' ||
-      n.includes('본관3층') ||
-      c.includes('본관3층') ||
-      fullText.includes('본관3층') ||
-      fullText.includes('본관 3층') ||
-      (s.includes('본관') && fullText.includes('3층'))
-    ) {
-      return '본관3층';
-    }
-    if (s === '본관' || n.includes('본관')) {
-      return '본관3층';
-    }
-    if (
-      s === '정자 앞' ||
-      s === '도로' ||
-      s === '주차장' ||
-      n.includes('정자 앞') ||
-      n.includes('도로') ||
-      n.includes('주차장')
-    ) {
-      return '정자 앞';
-    }
-    return s || '정자 앞';
-  };
+  // 구역 명칭 정규화 유틸 (전역 단일 진실 원천 getNormalizedSection 연동)
+  const getNormalizedDitchSection = getNormalizedSection;
 
   // 표준 구역 목록
   const sections = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];

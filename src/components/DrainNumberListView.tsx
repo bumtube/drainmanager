@@ -14,7 +14,12 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DitchMaster } from '../types';
-import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
+import {
+  SECTION_COLOR_CONFIG,
+  getSectionTheme,
+  getNormalizedSection,
+  ALL_SECTIONS,
+} from '../utils/sectionTheme';
 import { extractDitchNumber } from '../utils/ditchNumber';
 
 // 햅틱 진동 피드백
@@ -73,19 +78,6 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
   const [fastPassingId, setFastPassingId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
-
-  // 정규화된 구역명
-  const getNormalizedSection = (d: DitchMaster) => {
-    const s = d.section || '';
-    if (s.includes('도로') || s.includes('주차장') || s.includes('정자')) return '정자 앞';
-    if (s.includes('본관4층')) return '본관4층';
-    if (s.includes('본관3층') || s.includes('본관')) return '본관3층';
-    if (s.includes('별관')) return '별관';
-    if (s.includes('식수')) return '식수';
-    return '정자 앞';
-  };
-
-  const ALL_SECTIONS = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
 
   // 필터링 및 번호순 정렬된 배수로 목록
   const filteredAndSortedDitches = useMemo(() => {

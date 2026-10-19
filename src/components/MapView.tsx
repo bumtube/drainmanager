@@ -28,7 +28,12 @@ import confetti from 'canvas-confetti';
 import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
 import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
-import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
+import {
+  SECTION_COLOR_CONFIG,
+  getSectionTheme,
+  getNormalizedSection,
+  ALL_SECTIONS,
+} from '../utils/sectionTheme';
 import { extractDitchNumber, extractDitchNumberStr } from '../utils/ditchNumber';
 import { GpsHelpModal } from './GpsHelpModal';
 import { DrainNumberListView } from './DrainNumberListView';
@@ -163,8 +168,7 @@ export const MapView: React.FC<MapViewProps> = ({
   );
 
   // 구역 전체 목록 및 초기 선택값 (기본 5개 전체 구역 선택)
-  const ALL_SECTIONS = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
-  const [selectedSections, setSelectedSections] = useState<string[]>(ALL_SECTIONS);
+  const [selectedSections, setSelectedSections] = useState<string[]>([...ALL_SECTIONS]);
   const [isOverdueFilter, setIsOverdueFilter] = useState<boolean>(false);
 
   // 🗺️ 지도 뷰 vs 📋 번호 목록 뷰 모드 ('map' | 'list')
@@ -175,53 +179,6 @@ export const MapView: React.FC<MapViewProps> = ({
       return 'map';
     }
   });
-
-  // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '본관3층', '본관4층', '별관', '식수' 판별)
-  const getNormalizedSection = (d: DitchMaster): string => {
-    const s = d.section || '';
-    const n = d.name || '';
-    const c = d.code || '';
-    const a = d.address || '';
-    const m = d.memo || '';
-    const fullText = `${s} ${n} ${c} ${a} ${m}`;
-
-    if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '별관' || n.includes('별관')) return '별관';
-    if (
-      s === '본관4층' ||
-      n.includes('본관4층') ||
-      c.includes('본관4층') ||
-      fullText.includes('본관4층') ||
-      fullText.includes('본관 4층') ||
-      (s.includes('본관') && fullText.includes('4층'))
-    ) {
-      return '본관4층';
-    }
-    if (
-      s === '본관3층' ||
-      n.includes('본관3층') ||
-      c.includes('본관3층') ||
-      fullText.includes('본관3층') ||
-      fullText.includes('본관 3층') ||
-      (s.includes('본관') && fullText.includes('3층'))
-    ) {
-      return '본관3층';
-    }
-    if (s === '본관' || n.includes('본관')) {
-      return '본관3층';
-    }
-    if (
-      s === '정자 앞' ||
-      s === '도로' ||
-      s === '주차장' ||
-      n.includes('정자 앞') ||
-      n.includes('도로') ||
-      n.includes('주차장')
-    ) {
-      return '정자 앞';
-    }
-    return s || '정자 앞';
-  };
 
   // 지도 뷰에서 빠른 번호 이동(Quick Dial)용 배수로 목록
   const visibleDitchesForQuickDial = React.useMemo(() => {

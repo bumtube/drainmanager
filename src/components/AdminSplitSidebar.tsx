@@ -17,7 +17,12 @@ import {
 import { DitchMaster, InspectionRecord, DrainStatus, EmergencyAlert } from '../types';
 import { exportDitchesAndInspectionsToExcel } from '../services/excelExport';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
-import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
+import {
+  SECTION_COLOR_CONFIG,
+  getSectionTheme,
+  getNormalizedSection,
+  ALL_SECTIONS,
+} from '../utils/sectionTheme';
 
 interface AdminSplitSidebarProps {
   ditches: DitchMaster[];
@@ -46,16 +51,6 @@ export const AdminSplitSidebar: React.FC<AdminSplitSidebarProps> = ({
   const [statusFilter, setStatusFilter] = useState<'ALL' | DrainStatus | 'OVERDUE'>('ALL');
   const [sectionFilter, setSectionFilter] = useState<string>('ALL');
 
-  // 구역명 정규화
-  const getNormalizedDitchSection = (d: DitchMaster): string => {
-    const s = d.section || '';
-    const n = d.name || '';
-    if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '별관' || n.includes('별관')) return '별관';
-    if (s.includes('본관4층') || n.includes('본관4층') || n.includes('4층')) return '본관4층';
-    if (s.includes('본관3층') || n.includes('본관3층') || n.includes('3층')) return '본관3층';
-    return '정자 앞';
-  };
 
   // KPI 통계 산출
   const stats = useMemo(() => {
@@ -78,7 +73,7 @@ export const AdminSplitSidebar: React.FC<AdminSplitSidebarProps> = ({
   // 필터링된 배수로 목록
   const filteredDitches = useMemo(() => {
     return ditches.filter((d) => {
-      const sec = getNormalizedDitchSection(d);
+      const sec = getNormalizedSection(d);
       const matchSearch =
         d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -220,9 +215,13 @@ export const AdminSplitSidebar: React.FC<AdminSplitSidebarProps> = ({
 
         {/* 구역 칩 */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-          {(['ALL', '정자 앞', '본관3층', '본관4층', '별관', '식수'] as const).map((sec) => {
+          {(['ALL', ...ALL_SECTIONS] as const).map((sec) => {
             const isSelected = sectionFilter === sec;
             const theme = sec === 'ALL' ? null : SECTION_COLOR_CONFIG[sec];
+            const count =
+              sec === 'ALL'
+                ? ditches.length
+                : ditches.filter((d) => getNormalizedSection(d) === sec).length;
             return (
               <button
                 key={sec}
@@ -236,6 +235,9 @@ export const AdminSplitSidebar: React.FC<AdminSplitSidebarProps> = ({
               >
                 {theme && <span className={`w-1.5 h-1.5 rounded-full ${theme.dotBg}`} />}
                 <span>{sec === 'ALL' ? '전체' : sec}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-black/40">
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -264,7 +266,7 @@ export const AdminSplitSidebar: React.FC<AdminSplitSidebarProps> = ({
         ) : (
           filteredDitches.map((ditch) => {
             const isSelected = selectedDitch?.id === ditch.id;
-            const sec = getNormalizedDitchSection(ditch);
+            const sec = getNormalizedSection(ditch);
             const secTheme = getSectionTheme(sec);
             const overdue = getDitchOverdueInfo(ditch, 14);
 

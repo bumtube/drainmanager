@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Printer, X, Calendar, FileText, CheckCircle2, AlertTriangle, Flame, Siren, Download } from 'lucide-react';
 import { DitchMaster, InspectionRecord, EmergencyAlert } from '../types';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
+import { getNormalizedSection, ALL_SECTIONS } from '../utils/sectionTheme';
 
 interface ComprehensiveReportModalProps {
   isOpen: boolean;
@@ -53,41 +54,13 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
   const countWarning = periodInspections.filter((i) => i.urgencyLevel === '조치예정' || i.sedimentStatus === '준설필요' || i.structureStatus === '균열/이탈').length;
   const countDanger = periodInspections.filter((i) => i.urgencyLevel === '긴급조치' || i.sedimentStatus === '완전막힘' || i.structureStatus === '파손/붕괴').length;
 
-  // 구역 목록
-  const sections = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
-  const getSection = (d: DitchMaster) => {
-    if (!d) return '정자 앞';
-    const s = d.section || '';
-    const n = d.name || '';
-    const code = d.code || '';
-    const memo = d.memo || '';
-    const addr = d.address || '';
-    const combined = `${s} ${n} ${code} ${memo} ${addr}`;
-
-    if (s === '식수' || n.includes('식수')) return '식수';
-    if (s === '별관' || n.includes('별관')) return '별관';
-    if (s === '본관4층' || combined.includes('본관4층') || combined.includes('4층') || combined.includes('4F')) return '본관4층';
-    if (s === '본관3층' || combined.includes('본관3층') || combined.includes('3층') || combined.includes('3F') || s === '본관' || n.includes('본관')) return '본관3층';
-    if (
-      s === '정자 앞' ||
-      s === '도로' ||
-      s === '주차장' ||
-      n.includes('정자 앞') ||
-      n.includes('도로') ||
-      n.includes('주차장')
-    ) {
-      return '정자 앞';
-    }
-    return s || '정자 앞';
-  };
-
-  // 구역별 통계
+  // 구역별 통계 (전역 단일 진실 원천 getNormalizedSection 연동)
   const sectionStats = useMemo(() => {
-    return sections.map((sec) => {
-      const secDitches = ditches.filter((d) => getSection(d) === sec);
+    return ALL_SECTIONS.map((sec) => {
+      const secDitches = ditches.filter((d) => getNormalizedSection(d) === sec);
       const secInsp = periodInspections.filter((insp) => {
         const targetDitch = ditches.find((d) => d.id === insp.ditchId);
-        return targetDitch && getSection(targetDitch) === sec;
+        return targetDitch && getNormalizedSection(targetDitch) === sec;
       });
       const secInspectedDitchIds = new Set(secInsp.map((i) => i.ditchId));
       const secGood = secInsp.filter((i) => i.urgencyLevel === '정기점검' || (i.sedimentStatus === '정상' && i.structureStatus === '정상')).length;
