@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, Save, Trash2, Navigation, Check, Plus, Minus } from 'lucide-react';
 import { DitchMaster, DrainStatus } from '../types';
+import { getSectionTheme } from '../utils/sectionTheme';
 
 interface DitchEditModalProps {
   ditch: DitchMaster | null; // null이면 신규 등록
@@ -172,6 +173,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
             <div className="grid grid-cols-5 gap-1 sm:gap-2">
               {SECTIONS.map((sec) => {
                 const selected = section === sec;
+                const secTheme = getSectionTheme(sec);
                 return (
                   <button
                     key={sec}
@@ -179,14 +181,16 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                     onClick={() => handleSelectSection(sec)}
                     className={`min-h-[48px] px-0.5 rounded-xl font-black text-[11px] sm:text-xs border-2 transition-all flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
                       selected
-                        ? sec === '식수'
-                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-950'
-                          : 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-950'
+                        ? `${secTheme.btnActive} shadow-lg`
                         : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750'
                     }`}
                   >
                     <div className="flex items-center gap-0.5">
-                      {selected && <Check className="w-3 h-3 flex-shrink-0" />}
+                      {selected ? (
+                        <Check className="w-3 h-3 flex-shrink-0" />
+                      ) : (
+                        <span className={`w-1.5 h-1.5 rounded-full ${secTheme.dotBg} shrink-0 opacity-70`} />
+                      )}
                       <span className="truncate">{sec === '식수' ? '🌲 식수' : sec}</span>
                     </div>
                   </button>

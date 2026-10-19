@@ -26,6 +26,7 @@ import confetti from 'canvas-confetti';
 import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
 import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
+import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
 
 
 interface MapViewProps {
@@ -208,26 +209,30 @@ export const MapView: React.FC<MapViewProps> = ({
     return s || '정자 앞';
   };
 
-  // SVG/HTML 마커 생성 유틸 (추천 3번: 미니 구역 꼬리표 라벨 + 원형 핀 마커 + 번호/식수 나무아이콘)
+  // SVG/HTML 마커 생성 유틸 (구역별 고유 색상 마킹 + 핀 머리 위 구역 뱃지 + 원형 핀 / 식수 나무 아이콘)
   const createCustomMarkerIcon = (ditch: DitchMaster, isSelected: boolean, isDraggable: boolean) => {
-    let pinColor = '#16a34a'; // GOOD: 초록 (정상)
-    let borderColor = '#14532d';
+    // 1. 구역 확인 및 구역 고유 테마 조회
+    const section = getNormalizedSection(ditch);
+    const isTree = section === '식수';
+    const secTheme = getSectionTheme(section);
 
+    // 핀의 기본 색상은 구역의 고유 색상으로 지정 (정자 앞: 하늘색, 본관3층: 남색, 본관4층: 보라, 별관: 주황, 식수: 초록)
+    const pinColor = secTheme.colorHex;
+
+    // 2. 상태별 이상(주의/긴급) 인디케이터 배지 및 테두리 효과
+    let statusBadge = '';
+    let statusHaloClass = '';
     if (ditch.currentStatus === 'WARNING') {
-      pinColor = '#d97706'; // 주의: 주황
-      borderColor = '#78350f';
+      statusBadge = `<span class="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 border border-white text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow z-10 animate-pulse" title="주의 (준설요망)">⚠️</span>`;
+      statusHaloClass = 'ring-3 ring-amber-400 shadow-lg shadow-amber-500/60';
     } else if (ditch.currentStatus === 'DANGER') {
-      pinColor = '#dc2626'; // 긴급: 빨강
-      borderColor = '#7f1d1d';
+      statusBadge = `<span class="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 border border-white text-white font-black text-[9px] rounded-full flex items-center justify-center shadow z-10 animate-bounce" title="긴급 조치 필요">🚨</span>`;
+      statusHaloClass = 'ring-4 ring-rose-500 shadow-lg shadow-rose-500/80';
     }
 
     const scale = isSelected ? 'scale-125 z-50' : 'scale-100';
 
-    // 구역 확인 및 식수(나무) 여부 판별
-    const section = getNormalizedSection(ditch);
-    const isTree = section === '식수';
-
-    // 장기 미점검 여부 판별 (14일 초과)
+    // 3. 장기 미점검 여부 판별 (14일 초과)
     const overdueInfo = getDitchOverdueInfo(ditch, 14);
     const overdueBadge = overdueInfo.isOverdue
       ? `<span class="absolute -top-1.5 -left-1.5 w-4 h-4 bg-amber-500 border border-white text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow animate-pulse z-10" title="장기 미점검 (${overdueInfo.daysElapsed === 999 ? '미점검' : `${overdueInfo.daysElapsed}일 경과`})">⚠️</span>`
@@ -237,12 +242,10 @@ export const MapView: React.FC<MapViewProps> = ({
     const match = ditch.name?.match(/\d+/);
     const ditchNumber = match ? match[0] : (ditch.name || '1');
 
-    // 추천 3번: 핀 머리 위 미니 구역 꼬리표 라벨 스타일
-    const badgeStyle = isTree
-      ? 'bg-emerald-950/95 border-emerald-500/80 text-emerald-200'
-      : 'bg-slate-950/95 border-slate-600 text-slate-100';
+    // 4. 핀 머리 위 미니 구역 꼬리표 라벨 스타일
+    const badgeStyle = secTheme.badgeStyle;
 
-    // 마커 본체: 식수 구역은 하얀 식수(나무 실루엣 외곽선) 안에 녹색면과 하얀 글씨 숫자만 표시, 일반 배수로는 클래식 원형 핀
+    // 5. 마커 본체: 식수 구역은 하얀 식수(나무 실루엣 외곽선) 안에 녹색면과 하얀 글씨 숫자만 표시, 일반 배수로는 구역 고유 색상 원형 핀
     let markerBody = '';
     if (isTree) {
       const fontSize = ditchNumber.length > 2 ? '10.5' : ditchNumber.length === 2 ? '13.5' : '15';
@@ -253,6 +256,7 @@ export const MapView: React.FC<MapViewProps> = ({
       markerBody = `
         <div class="relative flex items-center justify-center">
           ${overdueBadge}
+          ${statusBadge}
           <svg width="42" height="44" viewBox="0 0 42 44" fill="none" xmlns="http://www.w3.org/2000/svg" style="${selectionFilter}">
             <!-- 하얀 식수 외곽 테두리 (white tree silhouette) + 녹색면 (green surface) -->
             <path d="M 21 2
@@ -287,7 +291,8 @@ export const MapView: React.FC<MapViewProps> = ({
       markerBody = `
         <div class="relative flex items-center justify-center">
           ${overdueBadge}
-          <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''}">
+          ${statusBadge}
+          <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''} ${statusHaloClass}">
             ${innerContent}
           </div>
           ${
@@ -302,7 +307,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
     const html = `
       <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
-        <!-- 추천 3번: 핀 머리 위 미니 구역 꼬리표 라벨 -->
+        <!-- 핀 머리 위 미니 구역 꼬리표 라벨 (구역별 고유 색상 적용) -->
         <div style="box-shadow: 0 2px 6px rgba(0,0,0,0.6);" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
           ${isTree ? '🌲 ' : ''}${section}
         </div>
@@ -722,6 +727,7 @@ export const MapView: React.FC<MapViewProps> = ({
           {(() => {
             const allDitchesCount = ditches.length;
             const isAllSelected = selectedSections.length === 5;
+            const allTheme = SECTION_COLOR_CONFIG['전체'];
             return (
               <button
                 type="button"
@@ -736,7 +742,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
                   isAllSelected
-                    ? 'bg-blue-600 text-white border-blue-400 shadow-blue-950/80 ring-2 ring-blue-400/40'
+                    ? allTheme.btnActive
                     : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
                 }`}
                 title="클릭 시 전체 구역(식수 포함) 토글"
@@ -744,7 +750,7 @@ export const MapView: React.FC<MapViewProps> = ({
                 <span>전체</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
-                    isAllSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
+                    isAllSelected ? allTheme.countActive : 'bg-slate-800 text-slate-400'
                   }`}
                 >
                   {allDitchesCount}
@@ -753,11 +759,12 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })()}
 
-          {/* 5개 개별 구역 버튼 (기본 선택: 정자 앞, 본관3층, 본관4층, 별관) */}
+          {/* 5개 개별 구역 버튼 (구역별 고유 색상 구분: 정자 앞, 본관3층, 본관4층, 별관, 식수) */}
           {(['정자 앞', '본관3층', '본관4층', '별관', '식수'] as const).map((sec) => {
             const isSelected = selectedSections.includes(sec);
             const count = ditches.filter((d) => getNormalizedSection(d) === sec).length;
-            const label = sec === '식수' ? '🌲 식수' : sec;
+            const secTheme = SECTION_COLOR_CONFIG[sec];
+            const label = secTheme.label;
 
             return (
               <button
@@ -778,15 +785,20 @@ export const MapView: React.FC<MapViewProps> = ({
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 border transition-all active:scale-95 flex items-center gap-1.5 shadow-lg ${
                   isSelected
-                    ? 'bg-blue-600 text-white border-blue-400 shadow-blue-950/80 ring-2 ring-blue-400/40'
+                    ? secTheme.btnActive
                     : 'bg-slate-950/85 hover:bg-slate-900 text-slate-300 border-slate-700/80 backdrop-blur-md'
                 }`}
                 title={`${label} 구역 표시/숨김 토글`}
               >
+                {!isSelected && (
+                  <span
+                    className={`w-2 h-2 rounded-full ${secTheme.dotBg} shrink-0 opacity-80`}
+                  />
+                )}
                 <span>{label}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
-                    isSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-800 text-slate-400'
+                    isSelected ? secTheme.countActive : 'bg-slate-800 text-slate-400'
                   }`}
                 >
                   {count}
@@ -1238,8 +1250,8 @@ export const MapView: React.FC<MapViewProps> = ({
                   {getNormalizedSection(selectedDitch) === '식수' ? '🌲 ' : ''}
                   {selectedDitch.name.replace(/(주차장|도로)/g, '정자 앞')}
                 </h3>
-                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-300 border border-slate-700">
-                  {getNormalizedSection(selectedDitch)}
+                <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${getSectionTheme(getNormalizedSection(selectedDitch)).badgeBg} ${getSectionTheme(getNormalizedSection(selectedDitch)).badgeBorder} ${getSectionTheme(getNormalizedSection(selectedDitch)).badgeText}`}>
+                  {getSectionTheme(getNormalizedSection(selectedDitch)).label}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">

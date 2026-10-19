@@ -34,6 +34,7 @@ import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { PrintReportModal } from './PrintReportModal';
 import { ComprehensiveReportModal } from './ComprehensiveReportModal';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
+import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
 
 
 export type SortField = 'code' | 'name' | 'section' | 'currentStatus' | 'lastInspectedAt';
@@ -563,29 +564,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span className="text-[10px] text-slate-400">총 4개 구역</span>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              {sectionSummaryList.map((sec) => (
-                <button
-                  key={sec.section}
-                  type="button"
-                  onClick={() => setSectionFilter(sectionFilter === sec.section ? 'ALL' : sec.section)}
-                  className={`p-2 rounded-lg border text-left transition-all active:scale-95 ${
-                    sectionFilter === sec.section
-                      ? 'bg-slate-850 border-blue-400 text-white shadow-sm ring-1 ring-blue-400/50'
-                      : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
-                  }`}
-                  title={`${sec.section} 구역 필터링`}
-                >
-                  <div className="flex justify-between items-center text-[11px] font-bold">
-                    <span>{sec.section === '식수' ? '🌲 식수' : sec.section}</span>
-                    <span className="font-mono text-slate-400">{sec.total}개소</span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-1 text-[10px]">
-                    <span className="text-emerald-400">{sec.goodCount} 정상</span>
-                    {sec.issueCount > 0 && <span className="text-amber-400 font-semibold">· {sec.issueCount} 주의</span>}
-                    {sec.overdueCount > 0 && <span className="text-rose-400 font-semibold">· {sec.overdueCount} 지연</span>}
-                  </div>
-                </button>
-              ))}
+              {sectionSummaryList.map((sec) => {
+                const isSelected = sectionFilter === sec.section;
+                const secTheme = getSectionTheme(sec.section);
+                return (
+                  <button
+                    key={sec.section}
+                    type="button"
+                    onClick={() => setSectionFilter(sectionFilter === sec.section ? 'ALL' : sec.section)}
+                    className={`p-2 rounded-lg border text-left transition-all active:scale-95 ${
+                      isSelected
+                        ? 'bg-slate-850 border-white text-white shadow-md ring-2 ring-white/30'
+                        : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                    title={`${sec.section} 구역 필터링`}
+                  >
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${secTheme.dotBg} shrink-0`} />
+                        <span>{sec.section === '식수' ? '🌲 식수' : sec.section}</span>
+                      </span>
+                      <span className="font-mono text-slate-400">{sec.total}개소</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-1 text-[10px]">
+                      <span className="text-emerald-400">{sec.goodCount} 정상</span>
+                      {sec.issueCount > 0 && <span className="text-amber-400 font-semibold">· {sec.issueCount} 주의</span>}
+                      {sec.overdueCount > 0 && <span className="text-rose-400 font-semibold">· {sec.overdueCount} 지연</span>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -764,22 +772,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </span>
             {sectionTabs.map((tab) => {
               const isSelected = sectionFilter === tab.key;
+              const secTheme = tab.key === 'ALL' ? SECTION_COLOR_CONFIG['전체'] : getSectionTheme(tab.key);
               return (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setSectionFilter(tab.key)}
-                  className={`h-9 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
+                  className={`h-9 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 active:scale-95 border ${
                     isSelected
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-950 font-black'
-                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800'
+                      ? secTheme.btnActive
+                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
                   }`}
                 >
+                  {!isSelected && (
+                    <span className={`w-2 h-2 rounded-full ${secTheme.dotBg} shrink-0 opacity-80`} />
+                  )}
                   <span>{tab.label}</span>
                   <span
                     className={`px-1.5 py-0.5 rounded-md text-[11px] font-mono font-bold ${
                       isSelected
-                        ? 'bg-blue-800 text-blue-100'
+                        ? secTheme.countActive
                         : 'bg-slate-800 text-slate-400'
                     }`}
                   >
