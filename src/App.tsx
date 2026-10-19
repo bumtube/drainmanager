@@ -492,9 +492,6 @@ export const App: React.FC = () => {
           className="flex items-center gap-2 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-left focus:outline-none"
           title="메인 첫 화면(현장 지도)으로 이동"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-slate-950 font-black text-sm shadow">
-            DM
-          </div>
           <div className="leading-tight">
             <h1 className="text-sm sm:text-base font-black text-white tracking-tight flex items-center gap-1.5">
               주택전시관
