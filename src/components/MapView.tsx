@@ -159,9 +159,9 @@ export const MapView: React.FC<MapViewProps> = ({
     [37.3611, 127.1149]  // 북동쪽 (NE: 북 300m, 동 300m)
   );
 
-  // 구역 선택 기본값: '정자 앞', '본관3층', '본관4층', '별관'만 기본 선택 (식수는 기본 제외)
-  const DEFAULT_SECTIONS = ['정자 앞', '본관3층', '본관4층', '별관'];
-  const [selectedSections, setSelectedSections] = useState<string[]>(DEFAULT_SECTIONS);
+  // 구역 전체 목록 및 초기 선택값 (기본 5개 전체 구역 선택)
+  const ALL_SECTIONS = ['정자 앞', '본관3층', '본관4층', '별관', '식수'];
+  const [selectedSections, setSelectedSections] = useState<string[]>(ALL_SECTIONS);
   const [isOverdueFilter, setIsOverdueFilter] = useState<boolean>(false);
 
   // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '본관3층', '본관4층', '별관', '식수' 판별)
@@ -683,21 +683,22 @@ export const MapView: React.FC<MapViewProps> = ({
 
         {/* 5. 구역 선택 필터 메뉴 (모바일 3열 2줄 그리드, PC 가로 1열 - 스크롤 잘림 완전 해결) */}
         <div className="pointer-events-auto grid grid-cols-3 sm:flex sm:items-center gap-1.5 py-0.5 px-0.5 max-w-xl">
-          {/* 전체 버튼 */}
+          {/* 전체 버튼 (누르면 전체선택, 한번 더 누르면 모든선택 해제) */}
           {(() => {
             const allDitchesCount = ditches.length;
-            const isAllSelected = selectedSections.length === 5;
+            const isAllSelected = selectedSections.length === ALL_SECTIONS.length;
             const allTheme = SECTION_COLOR_CONFIG['전체'];
             return (
               <button
                 type="button"
                 onClick={() => {
                   if (isAllSelected) {
-                    // 이미 전체 선택된 상태에서 클릭 시 기본값(정자 앞, 본관3층, 본관4층, 별관)으로 복귀
-                    setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관']);
+                    // 전체 선택된 상태에서 클릭 시 모든 선택 해제 (0개)
+                    setSelectedSections([]);
+                    onSelectDitch(null);
                   } else {
                     // 전체 5개 구역 모두 선택
-                    setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관', '식수']);
+                    setSelectedSections(ALL_SECTIONS);
                   }
                 }}
                 className={`w-full sm:w-auto px-2 sm:px-3 py-1.5 rounded-xl text-xs font-black border transition-all active:scale-95 flex items-center justify-center gap-1 shadow-md ${
@@ -705,7 +706,7 @@ export const MapView: React.FC<MapViewProps> = ({
                     ? allTheme.btnActive
                     : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-white/10 backdrop-blur-md'
                 }`}
-                title="클릭 시 전체 구역(식수 포함) 토글"
+                title={isAllSelected ? '모든 구역 선택 해제' : '전체 구역 모두 선택'}
               >
                 <span>전체</span>
                 <span
@@ -732,14 +733,8 @@ export const MapView: React.FC<MapViewProps> = ({
                 type="button"
                 onClick={() => {
                   if (isSelected) {
-                    // 이미 선택되어 있으면 해제 (단, 마지막 1개면 기본값으로 초기화)
-                    if (selectedSections.length > 1) {
-                      setSelectedSections((prev) => prev.filter((s) => s !== sec));
-                    } else {
-                      setSelectedSections(['정자 앞', '본관3층', '본관4층', '별관']);
-                    }
+                    setSelectedSections((prev) => prev.filter((s) => s !== sec));
                   } else {
-                    // 미선택 상태면 추가 선택
                     setSelectedSections((prev) => [...prev, sec]);
                   }
                 }}
