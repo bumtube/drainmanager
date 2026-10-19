@@ -38,6 +38,16 @@ import { extractDitchNumber, extractDitchNumberStr } from '../utils/ditchNumber'
 import { GpsHelpModal } from './GpsHelpModal';
 import { DrainNumberListView } from './DrainNumberListView';
 
+// 햅틱 진동 피드백
+const triggerHaptic = (pattern: number | number[] = 15) => {
+  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+    } catch {
+      // 무시
+    }
+  }
+};
 
 interface MapViewProps {
   ditches: DitchMaster[];
@@ -689,64 +699,11 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* 1. Leaflet 지도 컨테이너 */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* 2. 상단 조작 바 (지도 뷰 / 번호 목록 뷰 전환 & 일반/위성 지도 토글) */}
+      {/* 2. 상단 조작 바 (구역 필터 & 우측 상단 3-way [일반지도 | 위성지도 | 목록 뷰] 세그먼트) */}
       <div className="absolute top-3 inset-x-3 z-10 pointer-events-none flex flex-col gap-2">
-        <div className="flex items-center justify-between pointer-events-auto">
-          {/* Apple 스타일 [지도 뷰] ↔ [번호 목록 뷰] 토글 세그먼트 */}
-          <div className="bg-slate-950/85 backdrop-blur-md p-1 rounded-2xl border border-white/10 flex gap-1 shadow-xl">
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode('map');
-                try {
-                  localStorage.setItem('drainmanager_view_mode', 'map');
-                } catch {}
-                setTimeout(() => {
-                  mapRef.current?.invalidateSize();
-                }, 50);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
-                viewMode === 'map'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>지도 뷰</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode('list');
-                try {
-                  localStorage.setItem('drainmanager_view_mode', 'list');
-                } catch {}
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
-                viewMode === 'list'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <ListOrdered className="w-3.5 h-3.5" />
-              <span>번호 목록 뷰</span>
-            </button>
-          </div>
-
-          {/* 일반/위성 지도 토글 버튼 (지도 뷰일 때만) */}
-          {viewMode === 'map' && (
-            <button
-              onClick={() => setMapType((prev) => (prev === 'streets' ? 'satellite' : 'streets'))}
-              className="bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-700 text-white px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-1.5 text-xs font-bold active:scale-95 transition-all"
-            >
-              <Layers className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{mapType === 'streets' ? '일반지도' : '위성지도'}</span>
-            </button>
-          )}
-        </div>
-
-        {/* 5. 구역 선택 필터 메뉴 (모바일 3열 2줄 그리드, PC 가로 1열 - 스크롤 잘림 완전 해결) */}
-        <div className="pointer-events-auto grid grid-cols-3 sm:flex sm:items-center gap-1.5 py-0.5 px-0.5 max-w-xl">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 pointer-events-auto">
+          {/* 1. 구역 선택 필터 메뉴 (모바일 3열 2줄 그리드, PC 가로 1열 - 스크롤 잘림 완전 해결) */}
+          <div className="order-2 sm:order-1 grid grid-cols-3 sm:flex sm:items-center gap-1.5 py-0.5 px-0.5 max-w-xl">
           {/* 전체 버튼 (누르면 전체선택, 한번 더 누르면 모든선택 해제) */}
           {(() => {
             const allDitchesCount = ditches.length;
@@ -853,6 +810,84 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })()}
         </div>
+
+        {/* 2. 우측 상단: Apple 스타일 3-way 세그먼트 컨트롤 [일반지도 | 위성지도 | 목록 뷰] */}
+        <div className="order-1 sm:order-2 self-end sm:self-auto bg-slate-950/85 backdrop-blur-md p-1 rounded-2xl border border-white/10 flex items-center gap-1 shadow-xl shrink-0">
+          {/* 1. 일반지도 */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(10);
+              setViewMode('map');
+              setMapType('streets');
+              try {
+                localStorage.setItem('drainmanager_view_mode', 'map');
+              } catch {}
+              setTimeout(() => {
+                mapRef.current?.invalidateSize();
+              }, 50);
+            }}
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
+              viewMode === 'map' && mapType === 'streets'
+                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="일반 도로/지적 지도 보기"
+          >
+            <MapIcon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">일반지도</span>
+            <span className="sm:hidden">일반</span>
+          </button>
+
+          {/* 2. 위성지도 */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(10);
+              setViewMode('map');
+              setMapType('satellite');
+              try {
+                localStorage.setItem('drainmanager_view_mode', 'map');
+              } catch {}
+              setTimeout(() => {
+                mapRef.current?.invalidateSize();
+              }, 50);
+            }}
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
+              viewMode === 'map' && mapType === 'satellite'
+                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="고해상도 항공 위성 사진 보기"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">위성지도</span>
+            <span className="sm:hidden">위성</span>
+          </button>
+
+          {/* 3. 목록 뷰 */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(10);
+              setViewMode('list');
+              try {
+                localStorage.setItem('drainmanager_view_mode', 'list');
+              } catch {}
+            }}
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
+              viewMode === 'list'
+                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="배수로 번호 순번 점검 목록 보기"
+          >
+            <ListOrdered className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">목록 뷰</span>
+            <span className="sm:hidden">목록</span>
+          </button>
+        </div>
+      </div>
 
         {/* 🔢 지도 뷰에서도 사용 가능한 구역별 빠른 번호 이동 바 */}
         {viewMode === 'map' && visibleDitchesForQuickDial.length > 0 && (
@@ -1517,8 +1552,11 @@ export const MapView: React.FC<MapViewProps> = ({
               onSelectDitch(ditch);
               onViewHistory(ditch);
             }}
-            onSwitchToMap={(targetDitch) => {
+            onSwitchToMap={(targetDitch, preferredMapType) => {
               setViewMode('map');
+              if (preferredMapType) {
+                setMapType(preferredMapType);
+              }
               try {
                 localStorage.setItem('drainmanager_view_mode', 'map');
               } catch {}

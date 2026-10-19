@@ -11,6 +11,7 @@ import {
   Layers,
   ArrowUp,
   X,
+  ListOrdered,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DitchMaster } from '../types';
@@ -58,7 +59,7 @@ interface DrainNumberListViewProps {
   onOpenInspectionForm: (ditch: DitchMaster) => void;
   onFastPassInspection?: (ditch: DitchMaster) => Promise<void> | void;
   onViewHistory: (ditch: DitchMaster) => void;
-  onSwitchToMap: (targetDitch?: DitchMaster) => void;
+  onSwitchToMap: (targetDitch?: DitchMaster, mapType?: 'streets' | 'satellite') => void;
   userRole?: string;
   onGoHome?: () => void;
 }
@@ -202,19 +203,49 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
             </div>
           </div>
 
-          {/* 지도 뷰로 전환 버튼 */}
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic(15);
-              onSwitchToMap();
-            }}
-            className="h-9 px-3 bg-white/10 hover:bg-white/15 text-slate-200 border border-white/15 rounded-xl text-xs font-black flex items-center gap-1.5 active:scale-95 transition-all shadow"
-            title="지도 화면으로 전환"
-          >
-            <Map className="w-3.5 h-3.5 text-emerald-400" />
-            <span>지도 뷰 보기</span>
-          </button>
+          {/* 우측 상단: Apple 스타일 3-way 세그먼트 컨트롤 [일반지도 | 위성지도 | 목록 뷰] */}
+          <div className="bg-slate-950/85 backdrop-blur-md p-1 rounded-2xl border border-white/10 flex items-center gap-1 shadow-xl shrink-0">
+            {/* 1. 일반지도 */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(10);
+                onSwitchToMap(undefined, 'streets');
+              }}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 text-slate-400 hover:text-white"
+              title="일반 도로/지적 지도 보기"
+            >
+              <Map className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">일반지도</span>
+              <span className="sm:hidden">일반</span>
+            </button>
+
+            {/* 2. 위성지도 */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(10);
+                onSwitchToMap(undefined, 'satellite');
+              }}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 text-slate-400 hover:text-white"
+              title="고해상도 항공 위성 사진 보기"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">위성지도</span>
+              <span className="sm:hidden">위성</span>
+            </button>
+
+            {/* 3. 목록 뷰 (현재 선택됨) */}
+            <button
+              type="button"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all bg-emerald-500 text-slate-950 shadow-md font-black"
+              title="배수로 번호 순번 점검 목록 (현재 화면)"
+            >
+              <ListOrdered className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">목록 뷰</span>
+              <span className="sm:hidden">목록</span>
+            </button>
+          </div>
         </div>
 
         {/* 2. 구역 선택 필터 (3열 2행 모바일 그리드) */}
