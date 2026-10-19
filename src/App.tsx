@@ -633,32 +633,6 @@ export const App: React.FC = () => {
         </div>
       </header>
 
-      {/* PWA 전체화면 앱 설치 안내 배너 */}
-      {!isAppInstalled && showInstallBanner && (
-        <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border-b border-blue-500/30 px-3 py-2 flex items-center justify-between text-xs text-blue-200 z-30 shadow-md">
-          <div className="flex items-center gap-2 truncate">
-            <Smartphone className="w-4 h-4 text-blue-400 shrink-0 animate-bounce" />
-            <span className="truncate">
-              <b>[배수로 지킴이]</b> 홈 화면에 설치하여 브라우저 주소창 없는 전체화면 앱으로 사용하세요!
-            </span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleInstallApp}
-              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[11px] shadow active:scale-95 transition-all"
-            >
-              홈 화면에 설치
-            </button>
-            <button
-              onClick={() => setShowInstallBanner(false)}
-              className="p-1 text-slate-400 hover:text-white rounded"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 2. 메인 컨텐츠 영역 */}
       <main className="flex-1 relative flex flex-col overflow-hidden">
         {isLoading ? (
