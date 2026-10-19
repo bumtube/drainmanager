@@ -6,12 +6,14 @@ interface RoleSelectorProps {
   currentSession: UserSession | null;
   onSelectSession: (session: UserSession) => void;
   onCancel?: () => void;
+  onGoHome?: () => void;
 }
 
 export const RoleSelector: React.FC<RoleSelectorProps> = ({
   currentSession,
   onSelectSession,
   onCancel,
+  onGoHome,
 }) => {
   const [role, setRole] = useState<UserRole>(currentSession?.role || 'INSPECTOR');
   const [inspectorName, setInspectorName] = useState(
@@ -49,9 +51,20 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-700 text-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
         <div className="text-center mb-6">
-          <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full mb-2">
-            주택전시관 배수시설 관리
-          </span>
+          {onGoHome ? (
+            <button
+              type="button"
+              onClick={onGoHome}
+              className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold rounded-full mb-2 cursor-pointer transition-colors active:scale-95"
+              title="최초 접속페이지(지도)로 이동"
+            >
+              주택전시관 배수시설 관리
+            </button>
+          ) : (
+            <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full mb-2">
+              주택전시관 배수시설 관리
+            </span>
+          )}
           <h2 className="text-2xl font-black tracking-tight text-white">현장 점검자 / 역할 선택</h2>
           <p className="text-sm text-slate-400 mt-1">
             원활한 현장 점검 및 이력 관리를 위해 역할을 선택하세요.

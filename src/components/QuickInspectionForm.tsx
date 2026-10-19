@@ -46,6 +46,7 @@ interface QuickInspectionFormProps {
   onRetakePhoto?: () => void;
   onRemovePhoto?: () => void;
   onCancel: () => void;
+  onGoHome?: () => void;
 }
 
 export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
@@ -59,6 +60,7 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
   onRetakePhoto,
   onRemovePhoto,
   onCancel,
+  onGoHome,
 }) => {
   // 🎯 스마트 아코디언 상태 (기본값: false = 90% 이상없음 모드)
   const [isAbnormal, setIsAbnormal] = useState<boolean>(false);
@@ -339,7 +341,23 @@ export const QuickInspectionForm: React.FC<QuickInspectionFormProps> = ({
             <Sparkles className="w-4 h-4 text-emerald-400" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              {onGoHome && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(10);
+                      onGoHome();
+                    }}
+                    className="text-[11px] font-black text-emerald-400 hover:text-emerald-300 underline cursor-pointer active:scale-95 transition-all"
+                    title="최초 접속페이지(지도)로 이동"
+                  >
+                    주택전시관
+                  </button>
+                  <span className="text-slate-500 text-xs">/</span>
+                </>
+              )}
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-white/10 text-slate-300">
                 {ditch.code.replace(/(주차장|도로)/g, '정자 앞')}
               </span>

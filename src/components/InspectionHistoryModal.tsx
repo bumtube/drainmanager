@@ -17,6 +17,7 @@ interface InspectionHistoryModalProps {
   onClose: () => void;
   onDeleteInspection?: (inspectionId: string) => Promise<void> | void;
   onDeletePhoto?: (inspectionId: string) => Promise<void> | void;
+  onGoHome?: () => void;
 }
 
 export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
@@ -25,6 +26,7 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
   onClose,
   onDeleteInspection,
   onDeletePhoto,
+  onGoHome,
 }) => {
   // 전체화면 사진 확대 상태 ({ url, id, roundNumber })
   const [selectedPhoto, setSelectedPhoto] = useState<{
@@ -105,6 +107,19 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
         <div className="px-5 py-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
+              {onGoHome && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onGoHome}
+                    className="text-xs font-black text-emerald-400 hover:text-emerald-300 underline cursor-pointer active:scale-95 transition-all"
+                    title="최초 접속페이지(지도)로 이동"
+                  >
+                    주택전시관
+                  </button>
+                  <span className="text-slate-600 text-xs font-bold">/</span>
+                </>
+              )}
               <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">
                 INSPECTION TIMELINE
               </span>

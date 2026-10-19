@@ -10,6 +10,7 @@ interface ComprehensiveReportModalProps {
   ditches: DitchMaster[];
   inspections: InspectionRecord[];
   alerts?: EmergencyAlert[];
+  onGoHome?: () => void;
 }
 
 export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> = ({
@@ -18,6 +19,7 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
   ditches,
   inspections,
   alerts = [],
+  onGoHome,
 }) => {
   // 보고서 유형: 'weekly' (최근 7일) vs 'monthly' (최근 30일)
   const [reportType, setReportType] = useState<'weekly' | 'monthly'>('weekly');
@@ -116,32 +118,44 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-start overflow-y-auto p-2 sm:p-5">
       {/* 1. 상단 인쇄/전환 제어 툴바 (화면 표시 전용, 인쇄 시 자동 숨김) */}
       <div className="sticky top-2 z-50 mb-3 flex flex-wrap items-center justify-between gap-2 bg-slate-900/95 border border-slate-700 p-2 sm:p-2.5 rounded-2xl shadow-2xl max-w-[210mm] w-full text-white no-print">
-        {/* 주간 / 월간 전환 토글 */}
-        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
-          <button
-            type="button"
-            onClick={() => setReportType('weekly')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-              reportType === 'weekly'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            주간 종합보고서 (7일)
-          </button>
-          <button
-            type="button"
-            onClick={() => setReportType('monthly')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-              reportType === 'monthly'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            월간 종합보고서 (30일)
-          </button>
+        {/* 주간 / 월간 전환 토글 및 주택전시관 홈 바로가기 */}
+        <div className="flex items-center gap-1.5">
+          {onGoHome && (
+            <button
+              type="button"
+              onClick={onGoHome}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="최초 접속페이지(지도)로 이동"
+            >
+              주택전시관 홈
+            </button>
+          )}
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setReportType('weekly')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                reportType === 'weekly'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              주간 종합보고서 (7일)
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportType('monthly')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                reportType === 'monthly'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              월간 종합보고서 (30일)
+            </button>
+          </div>
         </div>
 
         {/* 인쇄 및 닫기 버튼 */}
@@ -177,7 +191,20 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
               배수시설 유지관리 {reportType === 'weekly' ? '주간' : '월간'} 종합보고서
             </h1>
             <p className="text-[11px] text-gray-600 mt-1 font-medium">
-              성남시 분당구 불정로 50 (주택전시관) 배수시설 종합 안전점검
+              성남시 분당구 불정로 50 (
+              {onGoHome ? (
+                <button
+                  type="button"
+                  onClick={onGoHome}
+                  className="font-black text-blue-700 hover:underline cursor-pointer"
+                  title="최초 접속페이지(지도)로 이동"
+                >
+                  주택전시관
+                </button>
+              ) : (
+                <span className="font-bold">주택전시관</span>
+              )}
+              ) 배수시설 종합 안전점검
             </p>
             <div className="text-[11px] font-bold text-blue-900 mt-1">
               점검 대상 기간: {startDateStr} ~ {endDateStr} ({reportType === 'weekly' ? '7일간' : '30일간'})
@@ -403,7 +430,18 @@ export const ComprehensiveReportModal: React.FC<ComprehensiveReportModalProps> =
         {/* 하단 기관 날인 및 확인 */}
         <div className="mt-6 pt-3 border-t border-black flex justify-between items-center text-[11px] text-gray-700">
           <span>보고서 생성일시: {new Date().toLocaleString('ko-KR')}</span>
-          <span className="font-bold">주택전시관</span>
+          {onGoHome ? (
+            <button
+              type="button"
+              onClick={onGoHome}
+              className="font-bold text-gray-900 hover:text-blue-700 underline cursor-pointer"
+              title="최초 접속페이지(지도)로 이동"
+            >
+              주택전시관
+            </button>
+          ) : (
+            <span className="font-bold">주택전시관</span>
+          )}
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ interface DitchEditModalProps {
   onSave: (ditch: DitchMaster) => Promise<void>;
   onDelete?: (ditchId: string) => Promise<void>;
   onClose: () => void;
+  onGoHome?: () => void;
 }
 
 // 현장 맞춤형 5개 구역 (정자 앞, 본관3층, 본관4층, 별관, 식수)
@@ -23,6 +24,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
   onSave,
   onDelete,
   onClose,
+  onGoHome,
 }) => {
   const isNew = !ditch;
 
@@ -146,9 +148,24 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-950">
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-black text-white text-base sm:text-lg">
-              {isNew ? '현장 등록' : '배수로 정보 수정'}
-            </h3>
+            <div className="flex items-center gap-1.5">
+              {onGoHome && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onGoHome}
+                    className="text-xs font-black text-emerald-400 hover:text-emerald-300 underline cursor-pointer active:scale-95 transition-all"
+                    title="최초 접속페이지(지도)로 이동"
+                  >
+                    주택전시관
+                  </button>
+                  <span className="text-slate-600 text-xs font-bold">/</span>
+                </>
+              )}
+              <h3 className="font-black text-white text-base sm:text-lg">
+                {isNew ? '현장 등록' : '배수로 정보 수정'}
+              </h3>
+            </div>
           </div>
           <button
             onClick={onClose}

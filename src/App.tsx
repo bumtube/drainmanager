@@ -87,6 +87,7 @@ export const App: React.FC = () => {
   const [isGpsHelpModalOpen, setIsGpsHelpModalOpen] = useState<boolean>(false);
   const [isComprehensiveReportOpen, setIsComprehensiveReportOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getCurrentSyncStatus());
+  const [resetMapKey, setResetMapKey] = useState<number>(0);
 
   // 점검 진행 중 임시 사진 및 GPS
   const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string>('');
@@ -475,6 +476,36 @@ export const App: React.FC = () => {
     }
   };
 
+  // 🏠 최초 접속페이지(현장 지도 뷰 + 기본 상태)로 전체 리셋
+  const handleGoHome = () => {
+    // 1. 모든 모달 닫기 및 선택 해제
+    setSelectedDitch(null);
+    setSelectedAlert(null);
+    setEditingDitch(null);
+    setCapturedPhotoUrl('');
+    setIsQuickFormOpen(false);
+    setIsHistoryOpen(false);
+    setIsDitchEditOpen(false);
+    setIsComprehensiveReportOpen(false);
+    setIsFirebaseModalOpen(false);
+    setIsOfflineModalOpen(false);
+    setIsGpsHelpModalOpen(false);
+    if (session) {
+      setIsRoleSelectorOpen(false);
+    }
+
+    // 2. 메인 뷰를 현장 지도로 변경
+    setCurrentView('map');
+
+    // 3. 번호 목록 뷰 대신 지도 뷰로 복귀하도록 저장값 초기화
+    try {
+      localStorage.setItem('drainmanager_view_mode', 'map');
+    } catch {}
+
+    // 4. MapView 컴포넌트 내부 리셋 트리거 (구역 필터 해제, 센터 좌표 복귀)
+    setResetMapKey((prev) => prev + 1);
+  };
+
   const userRole = session?.role || 'INSPECTOR';
 
   return (
@@ -484,14 +515,7 @@ export const App: React.FC = () => {
         {/* 좌측 로고 및 앱 타이틀 (클릭 시 메인 첫 화면인 현장 지도로 이동) */}
         <button
           type="button"
-          onClick={() => {
-            setCurrentView('map');
-            setSelectedDitch(null);
-            setSelectedAlert(null);
-            setIsQuickFormOpen(false);
-            setIsHistoryOpen(false);
-            setIsDitchEditOpen(false);
-          }}
+          onClick={handleGoHome}
           className="flex items-center gap-2 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-left focus:outline-none"
           title="메인 첫 화면(현장 지도)으로 이동"
         >
@@ -780,6 +804,8 @@ export const App: React.FC = () => {
                   setSelectedAlert(alert);
                   if (alert) setSelectedDitch(null);
                 }}
+                resetKey={resetMapKey}
+                onGoHome={handleGoHome}
               />
             </div>
           </div>
@@ -823,6 +849,7 @@ export const App: React.FC = () => {
             setIsQuickFormOpen(false);
             setCapturedPhotoUrl('');
           }}
+          onGoHome={handleGoHome}
         />
       )}
 
@@ -834,6 +861,7 @@ export const App: React.FC = () => {
           onClose={() => setIsHistoryOpen(false)}
           onDeleteInspection={handleDeleteInspection}
           onDeletePhoto={handleDeleteInspectionPhoto}
+          onGoHome={handleGoHome}
         />
       )}
 
@@ -849,6 +877,7 @@ export const App: React.FC = () => {
             setIsDitchEditOpen(false);
             setEditingDitch(null);
           }}
+          onGoHome={handleGoHome}
         />
       )}
 
@@ -858,6 +887,7 @@ export const App: React.FC = () => {
           currentSession={session}
           onSelectSession={handleSelectSession}
           onCancel={session ? () => setIsRoleSelectorOpen(false) : undefined}
+          onGoHome={session ? handleGoHome : undefined}
         />
       )}
 
@@ -896,6 +926,7 @@ export const App: React.FC = () => {
         onClose={() => setIsComprehensiveReportOpen(false)}
         ditches={ditches}
         inspections={inspections}
+        onGoHome={handleGoHome}
       />
     </div>
   );

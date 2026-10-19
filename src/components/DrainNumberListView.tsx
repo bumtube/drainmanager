@@ -60,6 +60,7 @@ interface DrainNumberListViewProps {
   onViewHistory: (ditch: DitchMaster) => void;
   onSwitchToMap: (targetDitch?: DitchMaster) => void;
   userRole?: string;
+  onGoHome?: () => void;
 }
 
 export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
@@ -72,6 +73,7 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
   onFastPassInspection,
   onViewHistory,
   onSwitchToMap,
+  onGoHome,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [onlyOverdue, setOnlyOverdue] = useState<boolean>(false);
@@ -170,12 +172,30 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
               <Sparkles className="w-4 h-4 text-emerald-400" />
             </span>
             <div>
-              <h2 className="text-base font-black text-white flex items-center gap-1.5">
-                <span>배수로 번호 순번 점검</span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {filteredAndSortedDitches.length}개소
-                </span>
-              </h2>
+              <div className="flex items-center gap-1.5">
+                {onGoHome && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        onGoHome();
+                      }}
+                      className="text-xs font-black text-emerald-400 hover:text-emerald-300 underline cursor-pointer active:scale-95 transition-all"
+                      title="최초 접속페이지(지도)로 이동"
+                    >
+                      주택전시관
+                    </button>
+                    <span className="text-slate-500 text-xs font-bold">/</span>
+                  </>
+                )}
+                <h2 className="text-base font-black text-white flex items-center gap-1.5">
+                  <span>배수로 번호 순번 점검</span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {filteredAndSortedDitches.length}개소
+                  </span>
+                </h2>
+              </div>
               <p className="text-[11px] text-slate-400">
                 지도를 보지 않고 번호 순서대로 즉시 점검할 수 있습니다.
               </p>

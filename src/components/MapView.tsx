@@ -60,6 +60,8 @@ interface MapViewProps {
   selectedAlert?: EmergencyAlert | null;
   onSelectAlert?: (alert: EmergencyAlert | null) => void;
   onFastPassInspection?: (ditch: DitchMaster) => Promise<void> | void;
+  resetKey?: number;
+  onGoHome?: () => void;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -83,6 +85,8 @@ export const MapView: React.FC<MapViewProps> = ({
   selectedAlert: externalSelectedAlert,
   onSelectAlert,
   onFastPassInspection,
+  resetKey,
+  onGoHome,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -179,6 +183,38 @@ export const MapView: React.FC<MapViewProps> = ({
       return 'map';
     }
   });
+
+  // 🔄 외부(상단 헤더 '주택전시관' 클릭 등)에서 리셋 신호 수신 시 최초 접속 화면 상태로 전체 복귀
+  const isInitialResetMount = useRef(true);
+  useEffect(() => {
+    if (isInitialResetMount.current) {
+      isInitialResetMount.current = false;
+      return;
+    }
+    // 1. 번호 목록 뷰에서 지도 뷰로 복귀
+    setViewMode('map');
+    try {
+      localStorage.setItem('drainmanager_view_mode', 'map');
+    } catch {}
+
+    // 2. 구역 필터 및 미점검 필터 모두 초기화 (기본값: 전체 필터 해제 상태 [])
+    setSelectedSections([]);
+    setIsOverdueFilter(false);
+
+    // 3. 선택된 배수로 및 긴급 알림 선택 해제
+    onSelectDitch(null);
+    if (onSelectAlert) onSelectAlert(null);
+    setInternalSelectedAlert(null);
+    setEnlargedAlertPhoto(null);
+
+    // 4. 지도 중심 좌표 및 줌 복귀 (성남시 분당구 불정로 50)
+    if (mapRef.current) {
+      mapRef.current.setView(FACILITY_CENTER, 18);
+      setTimeout(() => {
+        mapRef.current?.invalidateSize();
+      }, 100);
+    }
+  }, [resetKey]);
 
   // 지도 뷰에서 빠른 번호 이동(Quick Dial)용 배수로 목록 (구역 필터를 클릭했을 때만 활성화)
   const visibleDitchesForQuickDial = React.useMemo(() => {
@@ -1501,6 +1537,7 @@ export const MapView: React.FC<MapViewProps> = ({
               }, 100);
             }}
             userRole={userRole}
+            onGoHome={onGoHome}
           />
         </div>
       )}
