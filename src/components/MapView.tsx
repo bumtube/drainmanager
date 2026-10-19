@@ -21,14 +21,17 @@ import {
   Maximize2,
   Image as ImageIcon,
   Zap,
+  ListOrdered,
+  Map as MapIcon,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DitchMaster, DrainStatus, UserRole, EmergencyAlert } from '../types';
 import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 import { SECTION_COLOR_CONFIG, getSectionTheme } from '../utils/sectionTheme';
-import { extractDitchNumberStr } from '../utils/ditchNumber';
+import { extractDitchNumber, extractDitchNumberStr } from '../utils/ditchNumber';
 import { GpsHelpModal } from './GpsHelpModal';
+import { DrainNumberListView } from './DrainNumberListView';
 
 
 interface MapViewProps {
@@ -164,6 +167,15 @@ export const MapView: React.FC<MapViewProps> = ({
   const [selectedSections, setSelectedSections] = useState<string[]>(ALL_SECTIONS);
   const [isOverdueFilter, setIsOverdueFilter] = useState<boolean>(false);
 
+  // 🗺️ 지도 뷰 vs 📋 번호 목록 뷰 모드 ('map' | 'list')
+  const [viewMode, setViewMode] = useState<'map' | 'list'>(() => {
+    try {
+      return (localStorage.getItem('drainmanager_view_mode') as 'map' | 'list') || 'map';
+    } catch {
+      return 'map';
+    }
+  });
+
   // 구역 명칭 정규화 유틸 ('주차장'/'도로' -> '정자 앞', '본관3층', '본관4층', '별관', '식수' 판별)
   const getNormalizedSection = (d: DitchMaster): string => {
     const s = d.section || '';
@@ -210,6 +222,20 @@ export const MapView: React.FC<MapViewProps> = ({
     }
     return s || '정자 앞';
   };
+
+  // 지도 뷰에서 빠른 번호 이동(Quick Dial)용 배수로 목록
+  const visibleDitchesForQuickDial = React.useMemo(() => {
+    const list = ditches.filter((d) => {
+      const normSec = getNormalizedSection(d);
+      if (selectedSections.length > 0 && !selectedSections.includes(normSec)) {
+        return false;
+      }
+      return true;
+    });
+    return list
+      .map((d) => ({ num: extractDitchNumber(d.name, d.code), ditch: d }))
+      .sort((a, b) => a.num - b.num);
+  }, [ditches, selectedSections]);
 
   // SVG/HTML 마커 생성 유틸 (구역별 고유 색상 마킹 + 핀 머리 위 구역 뱃지 + 원형 핀 / 식수 나무 아이콘)
   const createCustomMarkerIcon = (ditch: DitchMaster, isSelected: boolean, isDraggable: boolean) => {
@@ -668,17 +694,60 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* 1. Leaflet 지도 컨테이너 */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* 2. 상단 조작 바 (일반/위성 지도 토글) */}
+      {/* 2. 상단 조작 바 (지도 뷰 / 번호 목록 뷰 전환 & 일반/위성 지도 토글) */}
       <div className="absolute top-3 inset-x-3 z-10 pointer-events-none flex flex-col gap-2">
-        <div className="flex items-center justify-end">
-          {/* 일반/위성 지도 토글 버튼 */}
-          <button
-            onClick={() => setMapType((prev) => (prev === 'streets' ? 'satellite' : 'streets'))}
-            className="pointer-events-auto bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-700 text-white px-3 py-2 rounded-xl shadow-xl flex items-center gap-1.5 text-xs font-bold active:scale-95 transition-all"
-          >
-            <Layers className="w-4 h-4 text-emerald-400" />
-            {mapType === 'streets' ? '일반지도' : '위성지도'}
-          </button>
+        <div className="flex items-center justify-between pointer-events-auto">
+          {/* Apple 스타일 [지도 뷰] ↔ [번호 목록 뷰] 토글 세그먼트 */}
+          <div className="bg-slate-950/85 backdrop-blur-md p-1 rounded-2xl border border-white/10 flex gap-1 shadow-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('map');
+                try {
+                  localStorage.setItem('drainmanager_view_mode', 'map');
+                } catch {}
+                setTimeout(() => {
+                  mapRef.current?.invalidateSize();
+                }, 50);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
+                viewMode === 'map'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              <span>지도 뷰</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('list');
+                try {
+                  localStorage.setItem('drainmanager_view_mode', 'list');
+                } catch {}
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
+                viewMode === 'list'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <ListOrdered className="w-3.5 h-3.5" />
+              <span>번호 목록 뷰</span>
+            </button>
+          </div>
+
+          {/* 일반/위성 지도 토글 버튼 (지도 뷰일 때만) */}
+          {viewMode === 'map' && (
+            <button
+              onClick={() => setMapType((prev) => (prev === 'streets' ? 'satellite' : 'streets'))}
+              className="bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-slate-700 text-white px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-1.5 text-xs font-bold active:scale-95 transition-all"
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{mapType === 'streets' ? '일반지도' : '위성지도'}</span>
+            </button>
+          )}
         </div>
 
         {/* 5. 구역 선택 필터 메뉴 (모바일 3열 2줄 그리드, PC 가로 1열 - 스크롤 잘림 완전 해결) */}
@@ -789,6 +858,40 @@ export const MapView: React.FC<MapViewProps> = ({
             );
           })()}
         </div>
+
+        {/* 🔢 지도 뷰에서도 사용 가능한 구역별 빠른 번호 이동 바 */}
+        {viewMode === 'map' && visibleDitchesForQuickDial.length > 0 && (
+          <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-xl">
+            <span className="text-[10px] font-black text-slate-300 bg-black/70 px-2 py-1 rounded-lg backdrop-blur-md shrink-0 border border-white/10">
+              번호 이동:
+            </span>
+            {visibleDitchesForQuickDial.map(({ num, ditch }) => {
+              const isSelected = selectedDitch?.id === ditch.id;
+              return (
+                <button
+                  key={ditch.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectDitch(ditch);
+                    if (mapRef.current) {
+                      mapRef.current.flyTo([ditch.latitude, ditch.longitude], 19, {
+                        duration: 1.0,
+                      });
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-black border backdrop-blur-md active:scale-90 transition-all shrink-0 ${
+                    isSelected
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md font-black'
+                      : 'bg-slate-900/80 hover:bg-slate-800 text-slate-200 border-white/10'
+                  }`}
+                  title={`${ditch.name} 위치로 이동`}
+                >
+                  #{num}번
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* 카카오톡 브라우저 감지 시 안내 배너 */}
         {isKakaoTalk && (
@@ -1393,6 +1496,53 @@ export const MapView: React.FC<MapViewProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 7. 배수로 번호 순번 점검 리스트 뷰 (지도를 보지 않고 번호로 점검하는 전용 화면) */}
+      {viewMode === 'list' && (
+        <div className="absolute inset-0 z-30">
+          <DrainNumberListView
+            ditches={ditches}
+            selectedSections={selectedSections}
+            onSelectSection={(sec) => {
+              setSelectedSections((prev) =>
+                prev.includes(sec) ? prev.filter((s) => s !== sec) : [...prev, sec]
+              );
+            }}
+            onSelectAllSections={() => setSelectedSections(ALL_SECTIONS)}
+            onClearSections={() => setSelectedSections([])}
+            onOpenInspectionForm={(ditch) => {
+              onSelectDitch(ditch);
+              if (onOpenInspectionForm) onOpenInspectionForm(ditch);
+              else onStartInspection(ditch);
+            }}
+            onFastPassInspection={onFastPassInspection}
+            onViewHistory={(ditch) => {
+              onSelectDitch(ditch);
+              onViewHistory(ditch);
+            }}
+            onSwitchToMap={(targetDitch) => {
+              setViewMode('map');
+              try {
+                localStorage.setItem('drainmanager_view_mode', 'map');
+              } catch {}
+              if (targetDitch) {
+                onSelectDitch(targetDitch);
+              }
+              setTimeout(() => {
+                if (mapRef.current) {
+                  mapRef.current.invalidateSize();
+                  if (targetDitch) {
+                    mapRef.current.flyTo([targetDitch.latitude, targetDitch.longitude], 19, {
+                      duration: 1.0,
+                    });
+                  }
+                }
+              }, 100);
+            }}
+            userRole={userRole}
+          />
         </div>
       )}
     </div>
