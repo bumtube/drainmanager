@@ -92,7 +92,7 @@ export const SECTION_COLOR_CONFIG: Record<string, SectionColorMeta> = {
   },
   '식수': {
     name: '식수',
-    label: '🌲 식수',
+    label: '식수',
     colorHex: '#16a34a', // Emerald Green (자연의 초록색)
     borderColor: '#14532d',
     badgeBg: 'bg-emerald-950/95',

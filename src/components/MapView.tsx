@@ -310,7 +310,7 @@ export const MapView: React.FC<MapViewProps> = ({
       <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
         <!-- 핀 머리 위 미니 구역 꼬리표 라벨 (구역별 고유 색상 적용) -->
         <div style="box-shadow: 0 2px 6px rgba(0,0,0,0.6);" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
-          ${isTree ? '🌲 ' : ''}${section}
+          ${section}
         </div>
 
         ${markerBody}
@@ -1207,7 +1207,6 @@ export const MapView: React.FC<MapViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-black text-white">
-                  {getNormalizedSection(selectedDitch) === '식수' ? '🌲 ' : ''}
                   {selectedDitch.name.replace(/(주차장|도로)/g, '정자 앞')}
                 </h3>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${getSectionTheme(getNormalizedSection(selectedDitch)).badgeBg} ${getSectionTheme(getNormalizedSection(selectedDitch)).badgeBorder} ${getSectionTheme(getNormalizedSection(selectedDitch)).badgeText}`}>

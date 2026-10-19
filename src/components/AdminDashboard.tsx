@@ -194,7 +194,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       { key: '본관3층', label: '본관3층', count: counts['본관3층'].total, issueCount: counts['본관3층'].issueCount },
       { key: '본관4층', label: '본관4층', count: counts['본관4층'].total, issueCount: counts['본관4층'].issueCount },
       { key: '별관', label: '별관', count: counts['별관'].total, issueCount: counts['별관'].issueCount },
-      { key: '식수', label: '🌲 식수', count: counts['식수'].total, issueCount: counts['식수'].issueCount },
+      { key: '식수', label: '식수', count: counts['식수'].total, issueCount: counts['식수'].issueCount },
     ];
   }, [ditches]);
 
@@ -582,7 +582,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex justify-between items-center text-[11px] font-bold">
                       <span className="flex items-center gap-1.5">
                         <span className={`w-2 h-2 rounded-full ${secTheme.dotBg} shrink-0`} />
-                        <span>{sec.section === '식수' ? '🌲 식수' : sec.section}</span>
+                        <span>{sec.section}</span>
                       </span>
                       <span className="font-mono text-slate-400">{sec.total}개소</span>
                     </div>

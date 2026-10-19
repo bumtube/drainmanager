@@ -189,7 +189,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
                       ) : (
                         <span className={`w-1.5 h-1.5 rounded-full ${secTheme.dotBg} shrink-0 opacity-70`} />
                       )}
-                      <span className="truncate">{sec === '식수' ? '🌲 식수' : sec}</span>
+                      <span className="truncate">{sec}</span>
                     </div>
                   </button>
                 );
