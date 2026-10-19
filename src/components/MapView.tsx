@@ -277,7 +277,11 @@ export const MapView: React.FC<MapViewProps> = ({
     // 핀의 기본 색상은 구역의 고유 색상으로 지정 (정자 앞: 하늘색, 본관3층: 남색, 본관4층: 보라, 별관: 주황, 식수: 초록)
     const pinColor = secTheme.colorHex;
 
-    // 2. 상태별 이상(주의/긴급) 인디케이터 배지 및 테두리 효과
+    // 2. 오늘 점검 완료 여부 판별
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isDoneToday = ditch.lastInspectedAt?.startsWith(todayStr);
+
+    // 3. 상태별 이상(주의/긴급) 인디케이터 배지 및 테두리 효과
     let statusBadge = '';
     let statusHaloClass = '';
     if (ditch.currentStatus === 'WARNING') {
@@ -286,28 +290,39 @@ export const MapView: React.FC<MapViewProps> = ({
     } else if (ditch.currentStatus === 'DANGER') {
       statusBadge = `<span class="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 border border-white text-white font-black text-[9px] rounded-full flex items-center justify-center shadow z-10 animate-bounce" title="긴급 조치 필요">🚨</span>`;
       statusHaloClass = 'ring-4 ring-rose-500 shadow-lg shadow-rose-500/80';
+    } else if (isDoneToday) {
+      // 오늘 점검 완료된 핀: 직관적인 초록 체크 뱃지 부착
+      statusBadge = `<span class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white text-white font-black text-[9px] rounded-full flex items-center justify-center shadow z-10" title="오늘 점검 완료">✓</span>`;
     }
 
-    const scale = isSelected ? 'scale-125 z-50' : 'scale-100';
+    // 미점검은 선명하고 생생하게, 오늘 완료된 배수로는 시각적 정리감을 주는 차분한 톤(opacity-85)
+    const scale = isSelected ? 'scale-125 z-50' : isDoneToday ? 'opacity-85 scale-95' : 'scale-100';
 
-    // 3. 장기 미점검 여부 판별 (14일 초과)
+    // 4. 장기 미점검 여부 판별 (14일 초과, 오늘 완료된 배수로는 미점검 경고 제외)
     const overdueInfo = getDitchOverdueInfo(ditch, 14);
-    const overdueBadge = overdueInfo.isOverdue
+    const overdueBadge = !isDoneToday && overdueInfo.isOverdue
       ? `<span class="absolute -top-1.5 -left-1.5 w-4 h-4 bg-amber-500 border border-white text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center shadow animate-pulse z-10" title="장기 미점검 (${overdueInfo.daysElapsed === 999 ? '미점검' : `${overdueInfo.daysElapsed}일 경과`})">⚠️</span>`
       : '';
 
     // 배수로 명칭 및 코드에서 시설 고유 일련번호 추출 ('4층', '3층' 등 층수 숫자 오인 방지)
     const ditchNumber = extractDitchNumberStr(ditch.name, ditch.code);
 
-    // 4. 핀 머리 위 미니 구역 꼬리표 라벨 스타일
+    // 5. 핀 머리 위 미니 구역 꼬리표 라벨 스타일
     const badgeStyle = secTheme.badgeStyle;
 
-    // 5. 마커 본체: 식수 구역은 하얀 식수(나무 실루엣 외곽선) 안에 녹색면과 하얀 글씨 숫자만 표시, 일반 배수로는 구역 고유 색상 원형 핀
+    // 위성 지도 야외 직사광선 극복: 네온 하이-콘트라스트 (두꺼운 흰색 테두리 + 네온 백색 광채)
+    const isSatellite = mapType === 'satellite';
+    const borderThickness = isSatellite ? '3.5px' : '2.5px';
+    const svgStrokeWidth = isSatellite ? '3.6' : '2.8';
+
+    // 6. 마커 본체: 식수 구역은 하얀 식수(나무 실루엣 외곽선) 안에 녹색면과 하얀 글씨 숫자만 표시, 일반 배수로는 구역 고유 색상 원형 핀
     let markerBody = '';
     if (isTree) {
       const fontSize = ditchNumber.length > 2 ? '10.5' : ditchNumber.length === 2 ? '13.5' : '15';
       const selectionFilter = isSelected
         ? 'filter: drop-shadow(0 0 6px #facc15) drop-shadow(0 4px 8px rgba(0,0,0,0.5));'
+        : isSatellite
+        ? 'filter: drop-shadow(0 0 7px rgba(255,255,255,0.95)) drop-shadow(0 4px 8px rgba(0,0,0,0.75));'
         : 'filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));';
 
       markerBody = `
@@ -327,7 +342,7 @@ export const MapView: React.FC<MapViewProps> = ({
                      Z"
                   fill="${pinColor}"
                   stroke="#ffffff"
-                  stroke-width="2.8"
+                  stroke-width="${svgStrokeWidth}"
                   stroke-linejoin="round"
                   stroke-linecap="round" />
             <!-- 하얀 글씨로 숫자만 큼직하게 표시 -->
@@ -345,11 +360,15 @@ export const MapView: React.FC<MapViewProps> = ({
         ditchNumber.length > 2 ? 'text-[11px]' : ditchNumber.length === 2 ? 'text-[13px]' : 'text-[15px]';
       const innerContent = `<span class="${textSize} font-black leading-none">${ditchNumber}</span>`;
 
+      const circleShadow = isSatellite
+        ? 'box-shadow: 0 0 9px rgba(255,255,255,0.9), 0 4px 12px rgba(0,0,0,0.75);'
+        : 'box-shadow: 0 4px 12px rgba(0,0,0,0.55);';
+
       markerBody = `
         <div class="relative flex items-center justify-center">
           ${overdueBadge}
           ${statusBadge}
-          <div style="background-color: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.55);" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''} ${statusHaloClass}">
+          <div style="background-color: ${pinColor}; border: ${borderThickness} solid #ffffff; ${circleShadow}" class="w-9 h-9 rounded-full flex items-center justify-center text-white font-black ${isSelected ? 'ring-4 ring-yellow-300' : ''} ${statusHaloClass}">
             ${innerContent}
           </div>
           ${
@@ -362,10 +381,14 @@ export const MapView: React.FC<MapViewProps> = ({
       `;
     }
 
+    const badgeShadow = isSatellite
+      ? 'box-shadow: 0 0 7px rgba(255,255,255,0.8), 0 2px 6px rgba(0,0,0,0.8);'
+      : 'box-shadow: 0 2px 6px rgba(0,0,0,0.6);';
+
     const html = `
       <div class="relative flex flex-col items-center justify-center transform transition-transform duration-200 ${scale}">
         <!-- 핀 머리 위 미니 구역 꼬리표 라벨 (구역별 고유 색상 적용) -->
-        <div style="box-shadow: 0 2px 6px rgba(0,0,0,0.6);" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
+        <div style="${badgeShadow}" class="mb-0.5 px-1.5 py-0.5 rounded-full border ${badgeStyle} text-[10px] font-black shadow whitespace-nowrap leading-none flex items-center justify-center">
           ${section}
         </div>
 
@@ -523,7 +546,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
       marker.addTo(markersLayerRef.current!);
     });
-  }, [ditches, selectedDitch, userRole, selectedSections, isOverdueFilter]);
+  }, [ditches, selectedDitch, userRole, selectedSections, isOverdueFilter, mapType]);
 
   // 3-1. 긴급상황 경광등 마커 아이콘 생성 (붉은색 플래시 핑 + 입체 경광등 뱃지)
   const createEmergencyAlertMarkerIcon = (alert: EmergencyAlert, isSelected: boolean) => {

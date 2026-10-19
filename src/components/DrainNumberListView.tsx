@@ -11,6 +11,7 @@ import {
   ArrowUp,
   X,
   ListOrdered,
+  Camera,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DitchMaster } from '../types';
@@ -78,6 +79,7 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [onlyOverdue, setOnlyOverdue] = useState<boolean>(false);
   const [fastPassingId, setFastPassingId] = useState<string | null>(null);
+  const [successModalDitch, setSuccessModalDitch] = useState<DitchMaster | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
 
@@ -298,6 +300,35 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
           </div>
         </div>
 
+        {/* 오늘의 점검 진행 현황 바 */}
+        {(() => {
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const total = ditches.length;
+          const doneToday = ditches.filter(
+            (d) => d.lastInspectedAt && d.lastInspectedAt.startsWith(todayStr)
+          ).length;
+          const pct = total > 0 ? Math.round((doneToday / total) * 100) : 0;
+          return (
+            <div className="pt-1 flex items-center justify-between text-xs px-0.5 border-t border-white/5">
+              <div className="flex items-center gap-1.5 font-bold text-slate-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                <span className="text-[11px] sm:text-xs">오늘 완료:</span>
+                <span className="text-emerald-400 font-black font-mono">
+                  {doneToday}/{total}개소
+                </span>
+                <span className="text-emerald-400/80 font-bold text-[10px]">({pct}%)</span>
+              </div>
+              {/* 미니 프로그레스 바 */}
+              <div className="w-24 sm:w-36 h-2 bg-slate-800 rounded-full overflow-hidden border border-white/10">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 4. 🔢 퀵 번호 다이얼 바 (1번, 2번, 3번... 원터치 점프) */}
         {availableNumbers.length > 0 && (
           <div className="pt-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
@@ -356,15 +387,19 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
             const theme = getSectionTheme(sec);
             const overdue = getOverdueStatus(ditch, 14);
             const isHighlighted = highlightedId === ditch.id;
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const isDoneToday = Boolean(ditch.lastInspectedAt && ditch.lastInspectedAt.startsWith(todayStr));
 
             return (
               <div
                 key={ditch.id}
                 id={`ditch-card-${ditch.id}`}
-                className={`bg-slate-900/90 border rounded-2xl p-3.5 sm:p-4 shadow-lg transition-all ${
+                className={`border rounded-2xl p-3.5 sm:p-4 shadow-lg transition-all ${
                   isHighlighted
                     ? 'border-emerald-400 ring-4 ring-emerald-500/40 scale-[1.02] bg-slate-850'
-                    : 'border-white/10 hover:border-white/20'
+                    : isDoneToday
+                    ? 'bg-slate-900/50 border-white/5 opacity-80 hover:opacity-100'
+                    : 'bg-slate-900/90 border-white/10 hover:border-white/20'
                 }`}
               >
                 {/* 상단: 번호 뱃지 & 구역명 & 상태 */}
@@ -399,16 +434,21 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
                     </div>
                   </div>
 
-                  {/* 점검 상태 뱃지 */}
+                  {/* 점검 상태 뱃지 (체크오프 시각화) */}
                   <div>
-                    {overdue.isOverdue ? (
+                    {isDoneToday ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                        <span>✓ 오늘 점검 완료</span>
+                      </span>
+                    ) : overdue.isOverdue ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
                         <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
                         <span>14일 경과</span>
                       </span>
                     ) : ditch.currentStatus === 'GOOD' ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-white/5 text-slate-300 border border-white/10">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
                         <span>통수 양호</span>
                       </span>
                     ) : (
@@ -438,77 +478,92 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
                   </div>
                 </div>
 
-                {/* 대형 원터치 점검 버튼 및 액션 버튼들 */}
+                {/* 대형 원터치 점검 버튼 및 액션 버튼들 (직관적 명칭 분리) */}
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* 1. 현장 상세 점검 (스마트 아코디언 오픈) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic(20);
-                        onOpenInspectionForm(ditch);
-                      }}
-                      className="h-12 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-slate-950" />
-                      <span>⚡ 현장 점검하기</span>
-                    </button>
-
-                    {/* 2. 5초 패스트패스 즉시 완료 (선택적) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* 1. 🟢 정상 즉시 완료 (원터치 패스트패스 - 70% 메인) */}
                     {onFastPassInspection && (
                       <button
                         type="button"
                         disabled={fastPassingId === ditch.id}
                         onClick={async () => {
-                          triggerHaptic(25);
+                          triggerHaptic([30, 80, 40]);
                           setFastPassingId(ditch.id);
                           try {
                             await onFastPassInspection(ditch);
                             confetti({
-                              particleCount: 50,
-                              spread: 60,
+                              particleCount: 65,
+                              spread: 65,
                               origin: { y: 0.8 },
                             });
+                            setSuccessModalDitch(ditch);
+                            setTimeout(() => {
+                              setSuccessModalDitch(null);
+                            }, 1200);
                           } catch (err) {
                             console.error('Fast pass error:', err);
-                            alert('패스트패스 저장 중 문제가 발생했습니다.');
+                            alert('점검 저장 중 문제가 발생했습니다.');
                           } finally {
                             setFastPassingId(null);
                           }
                         }}
-                        className="h-12 bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 font-black text-xs sm:text-sm rounded-xl border border-emerald-500/40 flex items-center justify-center gap-1.5 active:scale-95 transition-all disabled:opacity-50"
+                        className={`sm:col-span-2 h-12 rounded-xl flex items-center justify-center gap-2 font-black text-sm sm:text-base active:scale-95 transition-all shadow-md ${
+                          isDoneToday
+                            ? 'bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 shadow-emerald-950/40'
+                            : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/20'
+                        }`}
                       >
-                        <Zap className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
                         <span>
-                          {fastPassingId === ditch.id ? '저장 중...' : '5초 패스트패스'}
+                          {fastPassingId === ditch.id
+                            ? '저장 중...'
+                            : isDoneToday
+                            ? '✓ 오늘 점검 완료됨 (재점검)'
+                            : '🟢 정상 즉시 완료'}
                         </span>
                       </button>
                     )}
+
+                    {/* 2. 📷 사진/이상 등록 (상세 폼 열기 - 30% 서브) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(15);
+                        onOpenInspectionForm(ditch);
+                      }}
+                      className={`h-12 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white font-bold text-xs sm:text-sm rounded-xl border border-white/10 flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
+                        !onFastPassInspection ? 'col-span-full' : ''
+                      }`}
+                    >
+                      <Camera className="w-4 h-4 text-emerald-400" />
+                      <span>📷 사진/이상 등록</span>
+                    </button>
                   </div>
 
                   {/* 보조 버튼: 과거 이력 & 지도에서 위치 확인 */}
-                  <div className="flex items-center justify-end gap-2 pt-1 text-xs">
+                  <div className="flex items-center justify-between pt-1 text-xs px-1">
                     <button
                       type="button"
                       onClick={() => {
                         triggerHaptic(10);
                         onViewHistory(ditch);
                       }}
-                      className="px-2.5 py-1 text-slate-400 hover:text-white flex items-center gap-1 rounded-lg hover:bg-white/5 transition-colors font-medium"
+                      className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors font-medium"
                     >
                       <History className="w-3.5 h-3.5 text-slate-400" />
                       <span>과거 점검 이력</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => {
-                        triggerHaptic(15);
+                        triggerHaptic(10);
                         onSwitchToMap(ditch);
                       }}
-                      className="px-2.5 py-1 text-emerald-400 hover:text-emerald-300 flex items-center gap-1 rounded-lg hover:bg-emerald-500/10 transition-colors font-bold"
+                      className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-bold underline underline-offset-4"
                     >
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span>지도에서 위치 보기 ➜</span>
+                      <span>지도에서 위치 보기</span>
+                      <span>➔</span>
                     </button>
                   </div>
                 </div>
@@ -527,6 +582,25 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
       >
         <ArrowUp className="w-5 h-5 text-emerald-400" />
       </button>
+
+      {/* Apple Pay 스타일 완료 알림 모달 오버레이 */}
+      {successModalDitch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none animate-in fade-in duration-200">
+          <div className="bg-slate-900/95 border border-emerald-500/40 backdrop-blur-2xl px-7 py-6 rounded-3xl shadow-2xl flex flex-col items-center gap-3 text-center transform scale-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="text-white font-black text-lg">
+                {getNormalizedSection(successModalDitch)} #{extractDitchNumber(successModalDitch.name, successModalDitch.code)}번
+              </div>
+              <div className="text-emerald-400 font-bold text-sm mt-0.5">
+                정상 점검 완료!
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

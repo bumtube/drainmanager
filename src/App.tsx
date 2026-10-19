@@ -12,6 +12,7 @@ import {
   Download,
   X,
   Navigation,
+  CheckCircle2,
 } from 'lucide-react';
 import { precacheFacilityMapTiles } from './services/mapTilePrecache';
 import { DitchMaster, InspectionRecord, UserSession, EmergencyAlert } from './types';
@@ -558,9 +559,32 @@ export const App: React.FC = () => {
         {/* 우측 사용자 권한 뱃지 & 설정 버튼 (주사님 모드 vs 관리자 모드 분기) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {userRole === 'INSPECTOR' ? (
-            /* 🍎 Apple Dynamic Status Capsule (주사님 모드: 극강의 심플 2-캡슐 UI) */
+            /* 🍎 Apple Dynamic Status Capsule (주사님 모드: 극강의 심플 3-캡슐 UI) */
             <>
-              {/* 1. 통합 상태 다이내믹 캡슐 (GPS & 동기화 상태 원터치 뷰) */}
+              {/* 1. 오늘 점검 진행률 캡슐 (Today's Progress) */}
+              {(() => {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const total = ditches.length;
+                const doneToday = ditches.filter(
+                  (d) => d.lastInspectedAt && d.lastInspectedAt.startsWith(todayStr)
+                ).length;
+                const pct = total > 0 ? Math.round((doneToday / total) * 100) : 0;
+                return (
+                  <div
+                    className="h-9 px-2.5 sm:px-3 rounded-full text-xs font-black flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 shadow-sm backdrop-blur-xl"
+                    title={`오늘 총 ${total}개소 중 ${doneToday}개소 점검 완료 (${pct}%)`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
+                    <span className="hidden sm:inline">오늘 완료</span>
+                    <span className="font-mono text-white bg-emerald-600/70 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[11px]">
+                      {doneToday}/{total}
+                    </span>
+                    <span className="text-[10px] text-emerald-400/90 font-bold hidden xs:inline">({pct}%)</span>
+                  </div>
+                );
+              })()}
+
+              {/* 2. 통합 상태 다이내믹 캡슐 (GPS & 동기화 상태 원터치 뷰) */}
               <button
                 type="button"
                 onClick={() => {
