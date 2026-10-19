@@ -147,7 +147,7 @@ export const DitchEditModal: React.FC<DitchEditModalProps> = ({
           <div className="flex items-center gap-2">
             <MapPin className="w-5 h-5 text-emerald-400" />
             <h3 className="font-black text-white text-base sm:text-lg">
-              {isNew ? '현장 배수로 간편 등록' : '배수로 정보 수정'}
+              {isNew ? '현장 등록' : '배수로 정보 수정'}
             </h3>
           </div>
           <button
