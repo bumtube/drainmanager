@@ -91,6 +91,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // 3-Way 메인 워크스페이스 탭: 시설물 대장 | 일자별 점검 일지 | 통계 및 분석
   const [dashboardView, setDashboardView] = useState<'DITCHES' | 'DAILY_LOG' | 'ANALYTICS'>('DITCHES');
 
+  // 모바일 세로모드(375px~412px) 벤토 카드 압축/접기 토글 상태
+  const [isBentoCollapsed, setIsBentoCollapsed] = useState<boolean>(false);
+
   // 슬라이드오버 인스펙터 패널에서 선택된 배수로
   const [selectedInspectorDitch, setSelectedInspectorDitch] = useState<DitchMaster | null>(null);
 
@@ -620,226 +623,268 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className="flex-1 bg-slate-950 text-slate-100 overflow-y-auto p-3 sm:p-5 space-y-4">
       {/* 1. 🍱 ZONE 1: Executive Bento Grid (경영진 & 관리자용 4대 핵심 벤토 모듈) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5">
-        {/* [카드 A] 시설 건전성 종합 지수 (Facility Health Score) */}
-        <div className="lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-white/10 rounded-3xl p-5 shadow-xl relative overflow-hidden flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              시설 건전성 종합 지수
+      <div className="space-y-2">
+        {/* 모바일 상단 벤토 헤더 & 2단 컴팩트 접기/펼치기 제어 */}
+        <div className="flex sm:hidden items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-[11px] font-black text-slate-300 tracking-wider uppercase">
+              종합 모니터링 벤토
             </span>
-            <span className="text-[10px] font-bold text-slate-500 font-mono">100점 만점</span>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsBentoCollapsed((prev) => !prev)}
+            className="text-[10px] font-bold text-slate-400 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-white/10 active:scale-95 transition-all shadow-sm"
+          >
+            <span>{isBentoCollapsed ? '요약 벤토 펼치기' : '상단 벤토 접기'}</span>
+            {isBentoCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+          </button>
+        </div>
 
-          <div className="flex items-center gap-4 my-3">
-            {/* 원형 SVG 링 게이지 */}
-            <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
-              <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="7" className="text-slate-800" fill="transparent" />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="32"
-                  stroke={healthGrade.stroke}
-                  strokeWidth="7"
-                  strokeDasharray={201}
-                  strokeDashoffset={201 - (201 * healthScore) / 100}
-                  strokeLinecap="round"
-                  fill="transparent"
-                  className="transition-all duration-1000 ease-out"
-                />
-              </svg>
-              <span className="absolute font-mono font-black text-2xl text-white">
-                {healthScore}
+        {/* 접혔을 때 모바일 1줄 슬림 바 */}
+        {isBentoCollapsed ? (
+          <div
+            onClick={() => setIsBentoCollapsed(false)}
+            className="sm:hidden bg-slate-900/90 border border-white/10 rounded-2xl p-2.5 flex items-center justify-between gap-2 cursor-pointer shadow-md active:scale-98 transition-all"
+          >
+            <div className="flex items-center gap-2 text-[11px] font-mono truncate">
+              <span className={`px-2 py-0.5 rounded-md font-black border ${healthGrade.bg} ${healthGrade.color}`}>
+                건전성 {healthScore}점
               </span>
+              <span className="text-slate-300">
+                오늘 {todayInspectedDitches.length}/{ditches.length} ({ditches.length > 0 ? Math.round((todayInspectedDitches.length / ditches.length) * 100) : 0}%)
+              </span>
+              {countDanger > 0 && (
+                <span className="text-rose-400 font-bold">긴급 {countDanger}</span>
+              )}
             </div>
-
-            <div className="space-y-1">
-              <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black border ${healthGrade.bg} ${healthGrade.color}`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                <span>{healthGrade.label}</span>
+            <span className="text-[10px] text-blue-400 font-bold shrink-0">펼치기 ▼</span>
+          </div>
+        ) : (
+          /* 모바일(375px~412px) 2단 컴팩트 뷰 & 태블릿/PC 반응형 확장 그리드 */
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-12 gap-2 sm:gap-3.5">
+            {/* [카드 A] 시설 건전성 종합 지수 (Facility Health Score) */}
+            <div className="col-span-1 lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-white/10 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-xl relative overflow-hidden flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5 truncate">
+                  <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
+                  <span className="truncate">시설 건전성</span>
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 font-mono hidden sm:inline">100점 만점</span>
               </div>
-              <p className="text-xs text-slate-400">
-                총 {ditches.length}개소 중 정상 {countGood}개소
-              </p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-[11px]">
-            <div>
-              <span className="text-slate-500 block">정상 통수</span>
-              <span className="font-mono font-bold text-emerald-400">{countGood}개소</span>
-            </div>
-            <div>
-              <span className="text-slate-500 block">준설 요망</span>
-              <span className={`font-mono font-bold ${countWarning > 0 ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
-                {countWarning}개소
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-500 block">긴급 조치</span>
-              <span className={`font-mono font-bold ${countDanger > 0 ? 'text-rose-400 font-black' : 'text-slate-400'}`}>
-                {countDanger}개소
-              </span>
-            </div>
-          </div>
-        </div>
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 my-2 sm:my-3">
+                {/* 원형 SVG 링 게이지 */}
+                <div className="relative w-14 h-14 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center">
+                  <svg className="w-14 h-14 sm:w-20 sm:h-20 transform -rotate-90" viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="32" stroke="currentColor" strokeWidth="8" className="text-slate-800" fill="transparent" />
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="32"
+                      stroke={healthGrade.stroke}
+                      strokeWidth="8"
+                      strokeDasharray={201}
+                      strokeDashoffset={201 - (201 * healthScore) / 100}
+                      strokeLinecap="round"
+                      fill="transparent"
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <span className="absolute font-mono font-black text-base sm:text-2xl text-white">
+                    {healthScore}
+                  </span>
+                </div>
 
-        {/* [카드 B] 오늘 현장 가동 현황 (Today's Operations) */}
-        <div className="lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-blue-400" />
-              오늘 현장 점검 현황
-            </span>
-            <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              {todayStr}
-            </span>
-          </div>
-
-          <div className="my-2 space-y-2">
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-white font-mono">
-                {todayInspectedDitches.length}
-                <span className="text-xs text-slate-400 font-normal ml-1">/ {ditches.length}개소</span>
-              </span>
-              <span className="text-sm font-black text-emerald-400 font-mono">
-                {ditches.length > 0 ? Math.round((todayInspectedDitches.length / ditches.length) * 100) : 0}%
-              </span>
-            </div>
-
-            {/* 실시간 프로그레스 바 */}
-            <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5">
-              <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700 shadow-sm"
-                style={{
-                  width: `${ditches.length > 0 ? (todayInspectedDitches.length / ditches.length) * 100 : 0}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400 truncate max-w-[200px]">
-              <span className="text-slate-500">참여:</span>
-              <span className="font-bold text-slate-200">
-                {todayInspectors.length > 0 ? todayInspectors.join(', ') : '점검 대기 중'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDashboardView('DAILY_LOG')}
-              className="text-blue-400 hover:text-blue-300 font-bold text-xs flex items-center gap-1 shrink-0"
-            >
-              <span>일지 열기</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* [카드 C] 5대 구역별 리스크 매트릭스 (Spatial Health Heatmap) */}
-        <div className="lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-white/10 rounded-3xl p-5 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-purple-400" />
-              5대 구역별 리스크 매트릭스
-            </span>
-            <span className="text-[10px] text-slate-500 font-mono">총 5개 구역</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-            {sectionSummaryList.map((sec) => {
-              const hasIssues = sec.warning > 0 || sec.danger > 0 || sec.overdue > 0;
-              const secTheme = getSectionTheme(sec.section);
-              const isSelected = sectionFilter === sec.section;
-              return (
-                <button
-                  key={sec.section}
-                  type="button"
-                  onClick={() => {
-                    setSectionFilter(sectionFilter === sec.section ? 'ALL' : sec.section);
-                    setDashboardView('DITCHES');
-                  }}
-                  className={`p-2 rounded-xl border text-left transition-all active:scale-95 relative ${
-                    isSelected
-                      ? 'bg-slate-800 border-white text-white ring-2 ring-white/30'
-                      : hasIssues
-                      ? 'bg-slate-950 border-amber-500/40 text-slate-200 hover:border-amber-400'
-                      : 'bg-slate-950/60 border-white/5 text-slate-300 hover:border-white/20'
-                  }`}
-                  title={`${sec.section} 구역 필터링`}
-                >
-                  <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="flex items-center gap-1 truncate">
-                      <span className={`w-2 h-2 rounded-full ${secTheme.dotBg} shrink-0`} />
-                      <span className="truncate">{sec.section}</span>
-                    </span>
-                    <span className="font-mono text-slate-400 text-[10px]">{sec.total}</span>
+                <div className="text-center sm:text-left space-y-0.5 sm:space-y-1">
+                  <div className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:px-2.5 rounded-full text-[10px] sm:text-xs font-black border ${healthGrade.bg} ${healthGrade.color}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                    <span>{healthGrade.label}</span>
                   </div>
-                  <div className="flex items-center gap-1 mt-1 text-[10px] font-mono">
-                    <span className="text-emerald-400">{sec.good}정상</span>
-                    {sec.warning > 0 && <span className="text-amber-400 font-bold">·{sec.warning}주의</span>}
-                    {sec.danger > 0 && <span className="text-rose-400 font-bold">·{sec.danger}긴급</span>}
-                  </div>
-                  {hasIssues && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  <p className="text-[10px] sm:text-xs text-slate-400">
+                    정상 {countGood}/{ditches.length}
+                  </p>
+                </div>
+              </div>
 
-        {/* [카드 D] 🚨 즉시 조치 시급 큐 (Action Required Queue: 긴급/준설/14일+ 방치 배수로) */}
-        <div className="lg:col-span-12 bg-slate-900/90 border border-white/10 rounded-3xl p-4 shadow-xl">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <span>즉시 조치 시급 큐 (Action Required Queue)</span>
-                <span className="text-rose-400 font-mono">({actionRequiredList.length}개소)</span>
-              </h3>
+              <div className="grid grid-cols-3 gap-1 sm:gap-2 pt-2 border-t border-white/5 text-[10px] sm:text-[11px] text-center sm:text-left">
+                <div>
+                  <span className="text-slate-500 block truncate text-[9px] sm:text-[10px]">정상</span>
+                  <span className="font-mono font-bold text-emerald-400">{countGood}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block truncate text-[9px] sm:text-[10px]">주의</span>
+                  <span className={`font-mono font-bold ${countWarning > 0 ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
+                    {countWarning}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block truncate text-[9px] sm:text-[10px]">긴급</span>
+                  <span className={`font-mono font-bold ${countDanger > 0 ? 'text-rose-400 font-black' : 'text-slate-400'}`}>
+                    {countDanger}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span className="text-[11px] text-slate-500 hidden sm:inline">
-              클릭 시 해당 시설물 인스펙터 패널로 즉시 포커스 이동
-            </span>
-          </div>
 
-          {actionRequiredList.length === 0 ? (
-            <div className="py-3 px-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>현재 긴급 조치 또는 준설 시급 시설물이 없습니다. 모든 배수로가 정상 관리 중입니다.</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {actionRequiredList.map((item) => {
-                const sec = getNormalizedDitchSection(item.ditch);
-                const secTheme = getSectionTheme(sec);
-                return (
-                  <button
-                    key={item.ditch.id}
-                    type="button"
-                    onClick={() => {
-                      setDashboardView('DITCHES');
-                      setSelectedInspectorDitch(item.ditch);
+            {/* [카드 B] 오늘 현장 가동 현황 (Today's Operations) */}
+            <div className="col-span-1 lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-white/10 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1 sm:gap-1.5 truncate">
+                  <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400 shrink-0" />
+                  <span className="truncate">오늘 점검</span>
+                </span>
+                <span className="text-[9px] sm:text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 sm:px-2 py-0.5 rounded-full border border-emerald-500/20 truncate">
+                  {todayStr.slice(5)}
+                </span>
+              </div>
+
+              <div className="my-2 space-y-1.5 sm:space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-lg sm:text-2xl font-black text-white font-mono">
+                    {todayInspectedDitches.length}
+                    <span className="text-[10px] sm:text-xs text-slate-400 font-normal ml-0.5 sm:ml-1">/{ditches.length}</span>
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono">
+                    {ditches.length > 0 ? Math.round((todayInspectedDitches.length / ditches.length) * 100) : 0}%
+                  </span>
+                </div>
+
+                {/* 실시간 프로그레스 바 */}
+                <div className="h-2 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-white/5">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-700 shadow-sm"
+                    style={{
+                      width: `${ditches.length > 0 ? (todayInspectedDitches.length / ditches.length) * 100 : 0}%`,
                     }}
-                    className={`h-9 px-3 rounded-xl border text-xs font-bold flex items-center gap-2 shrink-0 active:scale-95 transition-all shadow-sm ${item.badgeClass}`}
-                  >
-                    <span>{item.icon}</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${secTheme.badgeStyle}`}>
-                      {sec}
-                    </span>
-                    <span className="font-mono text-white font-black">{item.ditch.code}</span>
-                    <span className="text-[11px] opacity-90">{item.ditch.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/40 font-mono font-bold">
-                      {item.label}
-                    </span>
-                  </button>
-                );
-              })}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] sm:text-xs">
+                <div className="flex items-center gap-1 text-slate-400 truncate max-w-[85px] sm:max-w-[200px]">
+                  <span className="text-slate-500 hidden sm:inline">참여:</span>
+                  <span className="font-bold text-slate-200 truncate">
+                    {todayInspectors.length > 0 ? (todayInspectors.length === 1 ? todayInspectors[0] : `${todayInspectors[0]} 외`) : '대기중'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDashboardView('DAILY_LOG')}
+                  className="text-blue-400 hover:text-blue-300 font-bold text-[10px] sm:text-xs flex items-center gap-0.5 sm:gap-1 shrink-0"
+                >
+                  <span>일지</span>
+                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* [카드 C] 5대 구역별 리스크 매트릭스 (Spatial Health Heatmap) */}
+            <div className="col-span-2 lg:col-span-4 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-white/10 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-xl flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400" />
+                  5대 구역별 리스크 매트릭스
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">총 5개 구역</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {sectionSummaryList.map((sec) => {
+                  const hasIssues = sec.warning > 0 || sec.danger > 0 || sec.overdue > 0;
+                  const secTheme = getSectionTheme(sec.section);
+                  const isSelected = sectionFilter === sec.section;
+                  return (
+                    <button
+                      key={sec.section}
+                      type="button"
+                      onClick={() => {
+                        setSectionFilter(sectionFilter === sec.section ? 'ALL' : sec.section);
+                        setDashboardView('DITCHES');
+                      }}
+                      className={`p-1.5 sm:p-2 rounded-xl border text-left transition-all active:scale-95 relative ${
+                        isSelected
+                          ? 'bg-slate-800 border-white text-white ring-2 ring-white/30'
+                          : hasIssues
+                          ? 'bg-slate-950 border-amber-500/40 text-slate-200 hover:border-amber-400'
+                          : 'bg-slate-950/60 border-white/5 text-slate-300 hover:border-white/20'
+                      }`}
+                      title={`${sec.section} 구역 필터링`}
+                    >
+                      <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold">
+                        <span className="flex items-center gap-1 truncate">
+                          <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${secTheme.dotBg} shrink-0`} />
+                          <span className="truncate">{sec.section}</span>
+                        </span>
+                        <span className="font-mono text-slate-400 text-[9px] sm:text-[10px]">{sec.total}</span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5 sm:mt-1 text-[9px] sm:text-[10px] font-mono">
+                        <span className="text-emerald-400">{sec.good}정상</span>
+                        {sec.warning > 0 && <span className="text-amber-400 font-bold">·{sec.warning}주의</span>}
+                        {sec.danger > 0 && <span className="text-rose-400 font-bold">·{sec.danger}긴급</span>}
+                      </div>
+                      {hasIssues && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 animate-pulse" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* [카드 D] 🚨 즉시 조치 시급 큐 (Action Required Queue: 긴급/준설/14일+ 방치 배수로) */}
+            <div className="col-span-2 lg:col-span-12 bg-slate-900/90 border border-white/10 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-xl">
+              <div className="flex items-center justify-between mb-2 sm:mb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-rose-500 animate-ping" />
+                  <h3 className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                    <span>즉시 조치 시급 큐</span>
+                    <span className="text-rose-400 font-mono">({actionRequiredList.length}개소)</span>
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-500 hidden sm:inline">
+                  클릭 시 해당 시설물 인스펙터 패널로 즉시 포커스 이동
+                </span>
+              </div>
+
+              {actionRequiredList.length === 0 ? (
+                <div className="py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl sm:rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>현재 긴급 조치 또는 준설 시급 시설물이 없습니다. 모든 배수로가 정상 관리 중입니다.</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {actionRequiredList.map((item) => {
+                    const sec = getNormalizedDitchSection(item.ditch);
+                    const secTheme = getSectionTheme(sec);
+                    return (
+                      <button
+                        key={item.ditch.id}
+                        type="button"
+                        onClick={() => {
+                          setDashboardView('DITCHES');
+                          setSelectedInspectorDitch(item.ditch);
+                        }}
+                        className={`h-8 sm:h-9 px-2.5 sm:px-3 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1.5 sm:gap-2 shrink-0 active:scale-95 transition-all shadow-sm ${item.badgeClass}`}
+                      >
+                        <span>{item.icon}</span>
+                        <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${secTheme.badgeStyle}`}>
+                          {sec}
+                        </span>
+                        <span className="font-mono text-white font-black">{item.ditch.code}</span>
+                        <span className="text-[11px] opacity-90 hidden sm:inline">{item.ditch.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/40 font-mono font-bold">
+                          {item.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. 🚨 긴급상황 경광등 슬림 알림 바 (발생 시에만 1줄 노출) */}
