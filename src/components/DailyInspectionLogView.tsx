@@ -24,6 +24,7 @@ import {
 import { DitchMaster, InspectionRecord } from '../types';
 import { getNormalizedSection, getSectionTheme } from '../utils/sectionTheme';
 import { exportDitchesAndInspectionsToExcel } from '../services/excelExport';
+import { MonthCalendarPickerModal } from './MonthCalendarPickerModal';
 
 interface DailyInspectionLogViewProps {
   ditches: DitchMaster[];
@@ -73,6 +74,21 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
 
     return list;
   }, [inspections]);
+
+  // 일자별 점검 건수 Map (달력 배지 표시용)
+  const inspectionCountByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    inspections.forEach((insp) => {
+      const d = extractDate(insp.inspectedAt);
+      if (d) {
+        map.set(d, (map.get(d) || 0) + 1);
+      }
+    });
+    return map;
+  }, [inspections]);
+
+  // 대화형 월간 달력 모달 열림 상태
+  const [isCalendarOpen, setIsCalendarOpen] = useState<boolean>(false);
 
   // 선택된 날짜 상태 ('ALL' 또는 'YYYY-MM-DD', 기본값: 오늘 또는 가장 최근 점검일)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -250,7 +266,7 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
 
           {/* 우측 퀵 컨트롤: 날짜 이동 화살표 + 엑셀 내보내기 */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* 이전일 / 다음일 스텝 버튼 */}
+            {/* 이전일 / 다음일 스텝 버튼 & 📅 대화형 달력 열기 */}
             <div className="flex items-center bg-slate-950 rounded-xl border border-white/10 p-0.5 shadow-sm">
               <button
                 type="button"
@@ -260,13 +276,18 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <input
-                type="date"
-                value={selectedDate === 'ALL' ? todayStr : selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-8 px-2 bg-transparent text-white text-xs font-bold font-mono focus:outline-none cursor-pointer"
-                title="조회할 날짜 직접 선택"
-              />
+
+              {/* 📅 대화형 달력 열기 버튼 (텍스트 선택 블록 및 미표시 문제 원천 해결) */}
+              <button
+                type="button"
+                onClick={() => setIsCalendarOpen(true)}
+                className="h-8 px-2.5 flex items-center gap-1.5 text-white hover:text-emerald-400 hover:bg-white/10 rounded-lg text-xs font-black font-mono transition-all active:scale-95 group"
+                title="월간 달력 열기 (날짜 직접 선택)"
+              >
+                <span>{selectedDate === 'ALL' ? '전체 일자' : selectedDate}</span>
+                <Calendar className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => shiftDate(1)}
@@ -319,18 +340,15 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
           </button>
 
           {/* 📅 달력으로 날짜 찾기 칩 */}
-          <label
-            onClick={(e) => {
-              try {
-                (e.currentTarget.querySelector('input') as HTMLInputElement)?.showPicker?.();
-              } catch {}
-            }}
-            className={`relative h-8 px-3 rounded-xl text-xs font-black shrink-0 transition-all active:scale-95 flex items-center gap-1.5 border cursor-pointer ${
+          <button
+            type="button"
+            onClick={() => setIsCalendarOpen(true)}
+            className={`h-8 px-3 rounded-xl text-xs font-black shrink-0 transition-all active:scale-95 flex items-center gap-1.5 border cursor-pointer ${
               selectedDate !== todayStr && selectedDate !== 'ALL'
                 ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-2 ring-blue-400/40'
                 : 'bg-white/5 hover:bg-white/10 text-blue-300 hover:text-white border-white/10 hover:border-blue-400/40'
             }`}
-            title="달력에서 원하는 날짜 직접 선택"
+            title="월간 달력에서 원하는 날짜 직접 선택"
           >
             <Calendar className="w-3.5 h-3.5 text-blue-400" />
             <span>
@@ -338,17 +356,7 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
                 ? `${selectedDate} (선택)`
                 : '달력으로 찾기'}
             </span>
-            <input
-              type="date"
-              value={selectedDate === 'ALL' ? todayStr : selectedDate}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedDate(e.target.value);
-                }
-              }}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-            />
-          </label>
+          </button>
 
           <button
             type="button"
@@ -805,6 +813,18 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* 📅 대화형 월간 달력 모달 (점검 건수 배지 & 빠른 날짜 선택) */}
+      <MonthCalendarPickerModal
+        isOpen={isCalendarOpen}
+        selectedDate={selectedDate}
+        inspectionCountByDate={inspectionCountByDate}
+        onSelectDate={(date) => {
+          setSelectedDate(date);
+          setIsCalendarOpen(false);
+        }}
+        onClose={() => setIsCalendarOpen(false)}
+      />
     </div>
   );
 
