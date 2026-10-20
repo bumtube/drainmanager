@@ -254,9 +254,15 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
                 <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-1.5">
                   일자별 점검 일지 & 기록
                 </h2>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold">
-                  {selectedDate === 'ALL' ? '전체' : selectedDate}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsCalendarOpen(true)}
+                  className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 font-bold border border-blue-500/30 flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                  title="클릭하여 달력 열기"
+                >
+                  <Calendar className="w-3 h-3 text-blue-400" />
+                  <span>{selectedDate === 'ALL' ? '전체' : selectedDate}</span>
+                </button>
               </div>
               <p className="text-xs text-slate-400 mt-0.5 font-medium">
                 {formatKoreanDate(selectedDate)}
@@ -267,32 +273,33 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
           {/* 우측 퀵 컨트롤: 날짜 이동 화살표 + 엑셀 내보내기 */}
           <div className="flex items-center gap-2 shrink-0">
             {/* 이전일 / 다음일 스텝 버튼 & 📅 대화형 달력 열기 */}
-            <div className="flex items-center bg-slate-950 rounded-xl border border-white/10 p-0.5 shadow-sm">
+            <div className="flex items-center bg-slate-950 rounded-2xl border border-white/15 p-1 shadow-lg gap-0.5">
               <button
                 type="button"
                 onClick={() => shiftDate(-1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
-                title="하루 전 날짜로 이동"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 active:scale-90 transition-all"
+                title="하루 전 날짜로 이동 (이전일)"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
 
-              {/* 📅 대화형 달력 열기 버튼 (텍스트 선택 블록 및 미표시 문제 원천 해결) */}
+              {/* 📅 대화형 달력 열기 버튼 (클릭 시 달력 팝업 노출) */}
               <button
                 type="button"
                 onClick={() => setIsCalendarOpen(true)}
-                className="h-8 px-2.5 flex items-center gap-1.5 text-white hover:text-emerald-400 hover:bg-white/10 rounded-lg text-xs font-black font-mono transition-all active:scale-95 group"
-                title="월간 달력 열기 (날짜 직접 선택)"
+                className="h-8 px-3 rounded-xl flex items-center gap-2 bg-slate-900 hover:bg-emerald-500/20 text-white hover:text-emerald-300 border border-white/10 hover:border-emerald-500/40 text-xs font-black font-mono transition-all active:scale-95 shadow-inner cursor-pointer group"
+                title="📅 클릭하여 달력에서 날짜 선택"
               >
-                <span>{selectedDate === 'ALL' ? '전체 일자' : selectedDate}</span>
                 <Calendar className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span>{selectedDate === 'ALL' ? '전체 일자' : selectedDate}</span>
+                <span className="text-[10px] text-emerald-400 font-bold ml-0.5">▼</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => shiftDate(1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
-                title="다음 날짜로 이동"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 active:scale-90 transition-all"
+                title="다음 날짜로 이동 (다음일)"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>

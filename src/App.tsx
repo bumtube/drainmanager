@@ -601,7 +601,7 @@ export const App: React.FC = () => {
           </div>
         </button>
 
-        {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 vs 일자별 점검일지 전환 - Apple Segmented Control) */}
+        {/* 중앙 탭 (관리자 모드일 때 지도 vs 대시보드 전환 - Apple Segmented Control) */}
         {userRole === 'ADMIN' && (
           <div className="flex bg-slate-950/80 p-1 rounded-2xl border border-white/10 shadow-inner">
             <button
@@ -626,16 +626,6 @@ export const App: React.FC = () => {
               {alerts.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" />
               )}
-            </button>
-            <button
-              onClick={() => setCurrentView('daily_log')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 ${
-                currentView === 'daily_log'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" /> <span className="hidden sm:inline">일자별</span>점검일지
             </button>
           </div>
         )}
