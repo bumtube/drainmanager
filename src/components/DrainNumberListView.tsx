@@ -300,35 +300,6 @@ export const DrainNumberListView: React.FC<DrainNumberListViewProps> = ({
           </div>
         </div>
 
-        {/* 오늘의 점검 진행 현황 바 */}
-        {(() => {
-          const todayStr = new Date().toISOString().slice(0, 10);
-          const total = ditches.length;
-          const doneToday = ditches.filter(
-            (d) => d.lastInspectedAt && d.lastInspectedAt.startsWith(todayStr)
-          ).length;
-          const pct = total > 0 ? Math.round((doneToday / total) * 100) : 0;
-          return (
-            <div className="pt-1 flex items-center justify-between text-xs px-0.5 border-t border-white/5">
-              <div className="flex items-center gap-1.5 font-bold text-slate-300">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
-                <span className="text-[11px] sm:text-xs">오늘 완료:</span>
-                <span className="text-emerald-400 font-black font-mono">
-                  {doneToday}/{total}개소
-                </span>
-                <span className="text-emerald-400/80 font-bold text-[10px]">({pct}%)</span>
-              </div>
-              {/* 미니 프로그레스 바 */}
-              <div className="w-24 sm:w-36 h-2 bg-slate-800 rounded-full overflow-hidden border border-white/10">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })()}
-
         {/* 4. 🔢 퀵 번호 다이얼 바 (1번, 2번, 3번... 원터치 점프) */}
         {availableNumbers.length > 0 && (
           <div className="pt-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
