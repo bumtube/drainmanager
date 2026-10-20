@@ -74,8 +74,8 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
-  // 3. 네비게이션 뷰: 'map' | 'dashboard' | 'daily_log'
-  const [currentView, setCurrentView] = useState<'map' | 'dashboard' | 'daily_log'>('map');
+  // 3. 네비게이션 뷰: 'map' | 'dashboard'
+  const [currentView, setCurrentView] = useState<'map' | 'dashboard'>('map');
   const [isDailyLogModalOpen, setIsDailyLogModalOpen] = useState<boolean>(false);
   const [activePrintTarget, setActivePrintTarget] = useState<{
     ditch: DitchMaster;
@@ -952,7 +952,7 @@ export const App: React.FC = () => {
               />
             </div>
           </div>
-        ) : currentView === 'dashboard' ? (
+        ) : (
           <AdminDashboard
             ditches={ditches}
             inspections={inspections}
@@ -973,18 +973,6 @@ export const App: React.FC = () => {
             onUpdateAlert={handleUpdateAlert}
             onDeleteInspection={handleDeleteInspection}
             onSaveDitch={handleSaveDitch}
-          />
-        ) : (
-          <DailyInspectionLogView
-            ditches={ditches}
-            inspections={inspections}
-            onSelectDitchOnMap={handleSelectDitchOnMap}
-            onOpenHistory={(ditch) => {
-              setSelectedDitch(ditch);
-              setIsHistoryOpen(true);
-            }}
-            onPrintInspection={(ditch, inspection) => setActivePrintTarget({ ditch, inspection })}
-            onDeleteInspection={handleDeleteInspection}
           />
         )}
       </main>
