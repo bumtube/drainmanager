@@ -318,6 +318,38 @@ export const DailyInspectionLogView: React.FC<DailyInspectionLogViewProps> = ({
             </span>
           </button>
 
+          {/* 📅 달력으로 날짜 찾기 칩 */}
+          <label
+            onClick={(e) => {
+              try {
+                (e.currentTarget.querySelector('input') as HTMLInputElement)?.showPicker?.();
+              } catch {}
+            }}
+            className={`relative h-8 px-3 rounded-xl text-xs font-black shrink-0 transition-all active:scale-95 flex items-center gap-1.5 border cursor-pointer ${
+              selectedDate !== todayStr && selectedDate !== 'ALL'
+                ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/25 ring-2 ring-blue-400/40'
+                : 'bg-white/5 hover:bg-white/10 text-blue-300 hover:text-white border-white/10 hover:border-blue-400/40'
+            }`}
+            title="달력에서 원하는 날짜 직접 선택"
+          >
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <span>
+              {selectedDate !== todayStr && selectedDate !== 'ALL'
+                ? `${selectedDate} (선택)`
+                : '달력으로 찾기'}
+            </span>
+            <input
+              type="date"
+              value={selectedDate === 'ALL' ? todayStr : selectedDate}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(e.target.value);
+                }
+              }}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+            />
+          </label>
+
           <button
             type="button"
             onClick={() => setSelectedDate('ALL')}

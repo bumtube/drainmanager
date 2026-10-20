@@ -111,7 +111,23 @@ export const App: React.FC = () => {
 
   // 7. PWA 홈 화면 설치 프롬프트 상태
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(false);
+  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (
+          window.matchMedia('(display-mode: standalone)').matches ||
+          (window.navigator as any).standalone === true ||
+          document.referrer.includes('android-app://')
+        ) {
+          return true;
+        }
+        if (localStorage.getItem('drainmanager_pwa_installed') === 'true') {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  });
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(true);
 
   // 데이터 로드 함수
@@ -180,22 +196,58 @@ export const App: React.FC = () => {
     });
 
     // 4. PWA 설치 가능 여부 및 설치 완료 감지
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
-      setIsAppInstalled(true);
-    }
+    const checkPwaInstalled = async () => {
+      try {
+        if (
+          window.matchMedia('(display-mode: standalone)').matches ||
+          (window.navigator as any).standalone === true ||
+          document.referrer.includes('android-app://') ||
+          localStorage.getItem('drainmanager_pwa_installed') === 'true'
+        ) {
+          setIsAppInstalled(true);
+          return;
+        }
+        if ('getInstalledRelatedApps' in navigator) {
+          const apps = await (navigator as any).getInstalledRelatedApps();
+          if (apps && apps.length > 0) {
+            setIsAppInstalled(true);
+            localStorage.setItem('drainmanager_pwa_installed', 'true');
+          }
+        }
+      } catch {}
+    };
+    checkPwaInstalled();
 
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      // 이전에 이미 설치했거나 숨김 처리한 경우 버튼 표시 안 함
+      if (localStorage.getItem('drainmanager_pwa_installed') === 'true') {
+        setIsAppInstalled(true);
+      }
     };
 
     const handleAppInstalled = () => {
       setIsAppInstalled(true);
+      try {
+        localStorage.setItem('drainmanager_pwa_installed', 'true');
+      } catch {}
       setDeferredPrompt(null);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
+
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsAppInstalled(true);
+        try {
+          localStorage.setItem('drainmanager_pwa_installed', 'true');
+        } catch {}
+      }
+    };
+    mediaQuery.addEventListener('change', handleDisplayModeChange);
 
     // 5. 현장 지도 타일 백그라운드 자동 프리캐싱 (성남시 분당구 불정로 50 부지 52개 타일)
     if (navigator.onLine) {
@@ -211,6 +263,7 @@ export const App: React.FC = () => {
       if (unsubSync) unsubSync();
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      mediaQuery.removeEventListener('change', handleDisplayModeChange);
     };
   }, []);
 
@@ -472,16 +525,29 @@ export const App: React.FC = () => {
   // PWA 홈 화면 앱 설치 트리거 (브라우저 주소창 없는 전체화면 앱화)
   const handleInstallApp = async () => {
     if (!deferredPrompt) {
-      alert(
-        '이미 홈 화면에 앱으로 설치되어 있거나, 브라우저 메뉴(⋮)에서 [홈 화면에 추가] 또는 [앱 설치]를 선택해 주세요.'
+      const confirmDismiss = window.confirm(
+        '이미 홈 화면에 앱으로 설치되어 있거나 브라우저 메뉴(⋮)에서 [앱 설치]를 진행할 수 있습니다.\n\n앱이 이미 설치되어 있다면 상단의 [앱 설치] 버튼을 숨기시겠습니까?'
       );
+      if (confirmDismiss) {
+        setIsAppInstalled(true);
+        try {
+          localStorage.setItem('drainmanager_pwa_installed', 'true');
+        } catch {}
+      }
       return;
     }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsAppInstalled(true);
-      setDeferredPrompt(null);
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsAppInstalled(true);
+        try {
+          localStorage.setItem('drainmanager_pwa_installed', 'true');
+        } catch {}
+        setDeferredPrompt(null);
+      }
+    } catch (e) {
+      console.warn('Install error:', e);
     }
   };
 
