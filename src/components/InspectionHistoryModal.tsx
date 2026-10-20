@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Calendar,
@@ -8,8 +8,10 @@ import {
   Trash2,
   AlertTriangle,
   CheckCircle2,
+  Sliders,
 } from 'lucide-react';
 import { DitchMaster, InspectionRecord } from '../types';
+import { BeforeAfterSliderModal } from './BeforeAfterSliderModal';
 
 interface InspectionHistoryModalProps {
   ditch: DitchMaster;
@@ -37,12 +39,31 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // 조치 전/후 비교 슬라이더 타깃 상태
+  const [sliderModalData, setSliderModalData] = useState<{
+    beforeImgUrl: string;
+    afterImgUrl: string;
+    title: string;
+    beforeDate?: string;
+    afterDate?: string;
+  } | null>(null);
+
   // 즉각적인 화면 피드백을 위한 낙관적 로컬 상태
   const [localInspections, setLocalInspections] = useState<InspectionRecord[]>(inspections);
 
   useEffect(() => {
     setLocalInspections(inspections);
   }, [inspections]);
+
+  // 사진을 보유한 회차 목록 추출 (최신순)
+  const photosWithRound = useMemo(() => {
+    return localInspections
+      .map((item, idx) => ({
+        item,
+        roundNumber: localInspections.length - idx,
+      }))
+      .filter((x) => Boolean(x.item.photoCurrentUrl));
+  }, [localInspections]);
 
   // 1. 특정 회차의 [점검데이터(기록) 분리 삭제]
   const handleDeleteRecord = async (item: InspectionRecord, roundNumber: number) => {
@@ -144,6 +165,44 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
 
         {/* 본문 이력 리스트 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* 🔄 조치 전/후 비교 슬라이더 배너 (2건 이상의 점검 사진이 있을 때) */}
+          {photosWithRound.length >= 2 && (
+            <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 border border-emerald-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-white flex items-center gap-1.5">
+                    <span>조치 전/후 비교 슬라이더 검증</span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-mono">
+                      #{photosWithRound[1].roundNumber}차 ◀▶ #{photosWithRound[0].roundNumber}차
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    최신 점검과 직전 점검의 사진을 좌우 드래그 슬라이더로 대조합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setSliderModalData({
+                    title: ditch.name,
+                    beforeImgUrl: photosWithRound[1].item.photoCurrentUrl,
+                    afterImgUrl: photosWithRound[0].item.photoCurrentUrl,
+                    beforeDate: `#{photosWithRound[1].roundNumber}차 (${photosWithRound[1].item.inspectedAt})`,
+                    afterDate: `#{photosWithRound[0].roundNumber}차 (${photosWithRound[0].item.inspectedAt})`,
+                  })
+                }
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shrink-0 flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>비교 슬라이더</span>
+              </button>
+            </div>
+          )}
+
           {localInspections.length === 0 ? (
             <div className="text-center py-12 text-slate-400 space-y-2">
               <Calendar className="w-12 h-12 mx-auto text-slate-600 mb-2" />
@@ -254,17 +313,37 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
                         <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                           <Image className="w-3.5 h-3.5 text-emerald-400" /> 현장 촬영 사진
                         </span>
-                        {onDeletePhoto && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePhoto(item, roundNumber)}
-                            disabled={deletingId === item.id}
-                            className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/40 flex items-center gap-1 transition-all active:scale-95"
-                            title="이 점검의 사진만 삭제하고 기록은 유지"
-                          >
-                            <Trash2 className="w-3 h-3" /> 사진만 삭제
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {item.photoPreviousUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSliderModalData({
+                                  title: `${ditch.name} (#${roundNumber}차)`,
+                                  beforeImgUrl: item.photoPreviousUrl!,
+                                  afterImgUrl: item.photoCurrentUrl,
+                                  beforeDate: '직전 점검 사진',
+                                  afterDate: `금회 점검 (${item.inspectedAt})`,
+                                })
+                              }
+                              className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/40 flex items-center gap-1 transition-all active:scale-95"
+                              title="직전 점검 사진과 금회 점검 사진을 슬라이더로 대조"
+                            >
+                              <Sliders className="w-3 h-3" /> 조치 전/후 비교
+                            </button>
+                          )}
+                          {onDeletePhoto && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(item, roundNumber)}
+                              disabled={deletingId === item.id}
+                              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/40 flex items-center gap-1 transition-all active:scale-95"
+                              title="이 점검의 사진만 삭제하고 기록은 유지"
+                            >
+                              <Trash2 className="w-3 h-3" /> 사진만 삭제
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -399,6 +478,18 @@ export const InspectionHistoryModal: React.FC<InspectionHistoryModalProps> = ({
           </div>
           <p className="text-slate-400 text-xs mt-3">바깥 영역을 터치하면 닫힙니다.</p>
         </div>
+      )}
+
+      {/* 6. 조치 전/후 비교 슬라이더 모달 */}
+      {sliderModalData && (
+        <BeforeAfterSliderModal
+          title={sliderModalData.title}
+          beforeImgUrl={sliderModalData.beforeImgUrl}
+          afterImgUrl={sliderModalData.afterImgUrl}
+          beforeDate={sliderModalData.beforeDate}
+          afterDate={sliderModalData.afterDate}
+          onClose={() => setSliderModalData(null)}
+        />
       )}
     </div>
   );

@@ -36,6 +36,7 @@ import {
   Check,
   ShieldCheck,
   ArrowUpRight,
+  Sliders,
 } from 'lucide-react';
 import { DitchMaster, InspectionRecord, DrainStatus, EmergencyAlert } from '../types';
 import { exportDitchesAndInspectionsToExcel } from '../services/excelExport';
@@ -44,6 +45,7 @@ import { fileToBase64Compressed } from '../services/imageOptimizer';
 import { PrintReportModal } from './PrintReportModal';
 import { ComprehensiveReportModal } from './ComprehensiveReportModal';
 import { DailyInspectionLogView } from './DailyInspectionLogView';
+import { BeforeAfterSliderModal } from './BeforeAfterSliderModal';
 import { getDitchOverdueInfo } from '../utils/ditchOverdue';
 import {
   SECTION_COLOR_CONFIG,
@@ -114,6 +116,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // 사진 확대 팝업 모달 상태
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
+
+  // 조치 전/후 비교 슬라이더 타깃 상태
+  const [beforeAfterTarget, setBeforeAfterTarget] = useState<{
+    title: string;
+    beforeImg: string;
+    afterImg: string;
+    beforeDate?: string;
+    afterDate?: string;
+  } | null>(null);
 
   // 경광등 데이터 수정 모달 상태
   const [editingAlertTarget, setEditingAlertTarget] = useState<EmergencyAlert | null>(null);
@@ -431,6 +442,68 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [ditches, inspections]);
+
+  // 특정 배수로의 전/후 비교 가능 사진 조회 헬퍼
+  const getDitchBeforeAfterPhotos = (ditchId: string) => {
+    const ditchInspections = inspections
+      .filter((insp) => insp.ditchId === ditchId && insp.photoCurrentUrl)
+      .sort((a, b) => (b.inspectedAt || '').localeCompare(a.inspectedAt || ''));
+
+    if (ditchInspections.length === 0) return null;
+
+    const latest = ditchInspections[0];
+    if (latest.photoPreviousUrl && latest.photoCurrentUrl) {
+      return {
+        beforeImg: latest.photoPreviousUrl,
+        afterImg: latest.photoCurrentUrl,
+        beforeDate: '조치 전 사진',
+        afterDate: `조치 후 (${latest.inspectedAt?.slice(0, 10) || '최근'})`,
+      };
+    }
+
+    if (ditchInspections.length >= 2) {
+      const prev = ditchInspections[1];
+      return {
+        beforeImg: prev.photoCurrentUrl,
+        afterImg: latest.photoCurrentUrl,
+        beforeDate: `직전 점검 (${prev.inspectedAt?.slice(0, 10) || '이전'})`,
+        afterDate: `최근 점검 (${latest.inspectedAt?.slice(0, 10) || '최근'})`,
+      };
+    }
+
+    return null;
+  };
+
+  // 통계 탭용: 전체 배수로 중 조치 전/후 대조가 가능한 배수로 카드 목록
+  const beforeAfterCardList = useMemo(() => {
+    const list: Array<{
+      ditch: DitchMaster;
+      beforeImg: string;
+      afterImg: string;
+      beforeDate: string;
+      afterDate: string;
+      status: DrainStatus;
+      memo?: string;
+    }> = [];
+
+    ditches.forEach((ditch) => {
+      const photos = getDitchBeforeAfterPhotos(ditch.id);
+      if (photos) {
+        const latest = latestInspectionMap.get(ditch.id);
+        list.push({
+          ditch,
+          beforeImg: photos.beforeImg,
+          afterImg: photos.afterImg,
+          beforeDate: photos.beforeDate,
+          afterDate: photos.afterDate,
+          status: ditch.currentStatus,
+          memo: latest?.memo,
+        });
+      }
+    });
+
+    return list;
+  }, [ditches, inspections, latestInspectionMap]);
 
   // 정렬 핸들러
   const handleSort = (field: SortField) => {
@@ -994,6 +1067,121 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 })}
               </div>
             </div>
+
+            {/* 최근 준설/정비 조치 전·후 검증 갤러리 */}
+            <div className="bg-slate-900 border border-white/10 rounded-3xl p-5 shadow-xl space-y-4 lg:col-span-2">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <span>최근 준설/정비 조치 전·후 검증 갤러리</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                        {beforeAfterCardList.length}개소 대조 가능
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      준설 전/후 사진을 좌우 드래그 슬라이더로 직접 교차 검증하고 작업 완료 여부를 확인합니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {beforeAfterCardList.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs bg-slate-950/50 rounded-2xl border border-dashed border-white/10">
+                  <Sliders className="w-8 h-8 mx-auto text-slate-600 mb-2 opacity-60" />
+                  <p className="font-bold text-slate-400">대조 가능한 조치 전/후 사진이 아직 등록되지 않았습니다.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    현장 점검 시 과거 사진과 금회 사진을 등록하거나 여러 회차 점검을 진행하면 자동으로 활성화됩니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {beforeAfterCardList.map((card) => {
+                    const sec = getNormalizedDitchSection(card.ditch);
+                    const secTheme = getSectionTheme(sec);
+                    return (
+                      <div
+                        key={card.ditch.id}
+                        className="bg-slate-950/80 border border-white/10 hover:border-emerald-500/40 rounded-2xl p-3.5 flex flex-col justify-between gap-3 transition-all group shadow-sm hover:shadow-emerald-950/30"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${secTheme.badgeStyle}`}>
+                              {sec}
+                            </span>
+                            <span className="text-[11px] font-mono text-slate-400">{card.ditch.code}</span>
+                          </div>
+
+                          <h5 className="font-bold text-white text-sm group-hover:text-emerald-300 transition-colors">
+                            {card.ditch.name}
+                          </h5>
+
+                          {/* 2단 나란히 썸네일 미리보기 */}
+                          <div className="grid grid-cols-2 gap-1.5 h-24 rounded-xl overflow-hidden border border-white/10 bg-black">
+                            <div className="relative h-full overflow-hidden">
+                              <img
+                                src={card.beforeImg}
+                                alt="Before"
+                                className="w-full h-full object-cover"
+                              />
+                              <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/75 text-amber-300 text-[9px] font-black rounded backdrop-blur-xs">
+                                전 ({card.beforeDate})
+                              </span>
+                            </div>
+                            <div className="relative h-full overflow-hidden">
+                              <img
+                                src={card.afterImg}
+                                alt="After"
+                                className="w-full h-full object-cover"
+                              />
+                              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/75 text-emerald-300 text-[9px] font-black rounded backdrop-blur-xs">
+                                후 ({card.afterDate})
+                              </span>
+                            </div>
+                          </div>
+
+                          {card.memo && (
+                            <p className="text-[11px] text-slate-400 line-clamp-1 italic">
+                              "{card.memo}"
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBeforeAfterTarget({
+                                title: card.ditch.name,
+                                beforeImg: card.beforeImg,
+                                afterImg: card.afterImg,
+                                beforeDate: card.beforeDate,
+                                afterDate: card.afterDate,
+                              })
+                            }
+                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+                          >
+                            <Sliders className="w-3.5 h-3.5" />
+                            <span>대조 슬라이더</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onSelectDitchOnMap(card.ditch)}
+                            className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-xl text-xs font-bold border border-white/10 active:scale-95"
+                            title="지도에서 위치 확인"
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -1345,21 +1533,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                           </td>
                           <td className="py-2.5 px-3.5 text-center whitespace-nowrap">
-                            {latest?.photoCurrentUrl ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEnlargedPhoto(latest.photoCurrentUrl);
-                                }}
-                                className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-white/10 inline-flex items-center justify-center transition-all"
-                                title="점검 사진 보기"
-                              >
-                                <Camera className="w-3.5 h-3.5" />
-                              </button>
-                            ) : (
-                              <span className="text-slate-600 text-[11px]">-</span>
-                            )}
+                            {(() => {
+                              const ba = getDitchBeforeAfterPhotos(ditch.id);
+                              return (
+                                <div className="flex items-center justify-center gap-1">
+                                  {latest?.photoCurrentUrl ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEnlargedPhoto(latest.photoCurrentUrl);
+                                      }}
+                                      className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-white/10 inline-flex items-center justify-center transition-all"
+                                      title="점검 사진 보기"
+                                    >
+                                      <Camera className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px]">-</span>
+                                  )}
+
+                                  {ba && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setBeforeAfterTarget({
+                                          title: ditch.name,
+                                          beforeImg: ba.beforeImg,
+                                          afterImg: ba.afterImg,
+                                          beforeDate: ba.beforeDate,
+                                          afterDate: ba.afterDate,
+                                        });
+                                      }}
+                                      className="w-6 h-6 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-400 border border-emerald-500/30 inline-flex items-center justify-center transition-all"
+                                      title="조치 전/후 비교 슬라이더 열기"
+                                    >
+                                      <Sliders className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="py-2.5 px-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1">
@@ -1451,33 +1666,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* 인스펙터 스크롤 바디 */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* 대표 사진 뷰어 */}
+            {/* 대표 사진 뷰어 및 조치 전/후 비교 액션 */}
             {(() => {
               const latest = latestInspectionMap.get(selectedInspectorDitch.id);
-              return latest?.photoCurrentUrl ? (
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group shadow-inner">
-                  <img
-                    src={latest.photoCurrentUrl}
-                    alt="최신 점검 사진"
-                    className="w-full h-44 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                    onClick={() => setEnlargedPhoto(latest.photoCurrentUrl)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setEnlargedPhoto(latest.photoCurrentUrl)}
-                    className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black/90 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm border border-white/20 active:scale-95"
-                  >
-                    <Maximize2 className="w-3 h-3" />
-                    <span>크게보기</span>
-                  </button>
-                  <span className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 text-emerald-400 rounded-md text-[10px] font-bold">
-                    최신 점검 사진 ({latest.inspectedAt?.slice(0, 10)})
-                  </span>
-                </div>
-              ) : (
-                <div className="h-32 rounded-2xl border border-dashed border-white/10 bg-slate-950/60 flex flex-col items-center justify-center text-slate-500 text-xs gap-1.5">
-                  <Camera className="w-6 h-6 text-slate-600" />
-                  <span>등록된 현장 점검 사진 없음</span>
+              const baPhotos = getDitchBeforeAfterPhotos(selectedInspectorDitch.id);
+
+              return (
+                <div className="space-y-2">
+                  {latest?.photoCurrentUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group shadow-inner">
+                      <img
+                        src={latest.photoCurrentUrl}
+                        alt="최신 점검 사진"
+                        className="w-full h-44 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                        onClick={() => setEnlargedPhoto(latest.photoCurrentUrl)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEnlargedPhoto(latest.photoCurrentUrl)}
+                        className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black/90 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm border border-white/20 active:scale-95"
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                        <span>크게보기</span>
+                      </button>
+                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-black/70 text-emerald-400 rounded-md text-[10px] font-bold">
+                        최신 점검 사진 ({latest.inspectedAt?.slice(0, 10)})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="h-32 rounded-2xl border border-dashed border-white/10 bg-slate-950/60 flex flex-col items-center justify-center text-slate-500 text-xs gap-1.5">
+                      <Camera className="w-6 h-6 text-slate-600" />
+                      <span>등록된 현장 점검 사진 없음</span>
+                    </div>
+                  )}
+
+                  {/* 조치 전/후 비교 슬라이더 버튼 (인스펙터 시트) */}
+                  {baPhotos && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBeforeAfterTarget({
+                          title: selectedInspectorDitch.name,
+                          beforeImg: baPhotos.beforeImg,
+                          afterImg: baPhotos.afterImg,
+                          beforeDate: baPhotos.beforeDate,
+                          afterDate: baPhotos.afterDate,
+                        })
+                      }
+                      className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 border border-emerald-400/30 transition-all active:scale-98"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>🔄 조치 전/후 (Before/After) 비교 슬라이더</span>
+                    </button>
+                  )}
                 </div>
               );
             })()}
@@ -1707,6 +1948,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           ditches={ditches}
           inspections={inspections}
           alerts={alerts}
+        />
+      )}
+
+      {/* 🔄 조치 전/후 비교 슬라이더 모달 */}
+      {beforeAfterTarget && (
+        <BeforeAfterSliderModal
+          title={beforeAfterTarget.title}
+          beforeImgUrl={beforeAfterTarget.beforeImg}
+          afterImgUrl={beforeAfterTarget.afterImg}
+          beforeDate={beforeAfterTarget.beforeDate}
+          afterDate={beforeAfterTarget.afterDate}
+          onClose={() => setBeforeAfterTarget(null)}
         />
       )}
     </div>
